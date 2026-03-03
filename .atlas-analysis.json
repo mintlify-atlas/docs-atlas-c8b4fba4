@@ -1,0 +1,72 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "NativePHP Camera Plugin",
+  "projectDescription": "Camera plugin for NativePHP Mobile providing photo capture, video recording, and gallery picker functionality.",
+  "theme": "palm",
+  "primaryColor": "#6366F1",
+  "lightColor": "#818CF8",
+  "darkColor": "#4F46E5",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting Started",
+        "pages": [
+          "introduction",
+          "installation",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/photo-capture",
+          "guides/video-recording",
+          "guides/gallery-picker",
+          "guides/permissions"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api/overview",
+          "api/camera-methods",
+          "api/events",
+          "api/php-api",
+          "api/javascript-api"
+        ]
+      },
+      {
+        "group": "Advanced",
+        "pages": [
+          "advanced/platform-specific",
+          "advanced/storage-locations",
+          "advanced/troubleshooting"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Photo capture with device camera",
+    "Video recording with configurable duration",
+    "Gallery media picker with filtering",
+    "Cross-platform (Android & iOS) support",
+    "Event-driven architecture",
+    "Fluent PHP and JavaScript APIs"
+  ],
+  "publicApiSurface": [
+    "Camera::getPhoto()",
+    "Camera::recordVideo()",
+    "Camera::pickImages()",
+    "PendingVideoRecorder::maxDuration()",
+    "PendingVideoRecorder::id()",
+    "PendingVideoRecorder::event()",
+    "PendingVideoRecorder::remember()",
+    "PendingVideoRecorder::start()",
+    "Events\\Camera\\PhotoTaken",
+    "Events\\Camera\\PhotoCancelled",
+    "Events\\Camera\\VideoRecorded",
+    "Events\\Camera\\VideoCancelled",
+    "Events\\Gallery\\MediaSelected",
+    "Events\\Camera\\PermissionDenied"
+  ]
+}
