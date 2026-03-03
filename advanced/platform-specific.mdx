@@ -1,0 +1,199 @@
+---
+title: Platform-specific details
+description: Deep dive into Android and iOS implementations of the Camera plugin
+---
+
+The NativePHP Camera plugin provides a unified API across Android and iOS, but understanding the platform-specific implementations can help with debugging and advanced use cases.
+
+## Bridge Architecture
+
+The plugin uses NativePHP's bridge system to connect PHP/JavaScript code to native platform implementations:
+
+<CardGroup cols={3}>
+  <Card title="Camera.GetPhoto" icon="camera">
+    **Android:** `com.nativephp.camera.CameraFunctions.GetPhoto`
+    
+    **iOS:** `CameraFunctions.GetPhoto`
+  </Card>
+  <Card title="Camera.RecordVideo" icon="video">
+    **Android:** `com.nativephp.camera.CameraFunctions.RecordVideo`
+    
+    **iOS:** `CameraFunctions.RecordVideo`
+  </Card>
+  <Card title="Camera.PickMedia" icon="images">
+    **Android:** `com.nativephp.camera.GalleryFunctions.PickMedia`
+    
+    **iOS:** `CameraFunctions.PickMedia`
+  </Card>
+</CardGroup>
+
+## Android Implementation
+
+### Minimum Version
+
+Android API level **33** (Android 13) or higher is required.
+
+### Required Permissions
+
+The following Android permissions are automatically declared in the plugin manifest:
+
+```xml
+android.permission.CAMERA
+android.permission.RECORD_AUDIO
+android.permission.FOREGROUND_SERVICE
+android.permission.FOREGROUND_SERVICE_SHORT_SERVICE
+```
+
+### CameraCoordinator
+
+The Android implementation uses a `CameraCoordinator` singleton that manages camera operations:
+
+- Installed as a Fragment in the host activity
+- Handles camera intents and result callbacks
+- Manages the lifecycle of camera operations
+
+### Foreground Service for Video
+
+For video recording, Android uses a foreground service to ensure the recording continues even if the app is backgrounded:
+
+<CodeGroup>
+```kotlin Service Configuration
+{
+  "name": ".CameraForegroundService",
+  "foregroundServiceType": "shortService",
+  "exported": false
+}
+```
+</CodeGroup>
+
+This service is configured as a "short service" type, appropriate for brief camera operations.
+
+### Native Classes
+
+- **CameraFunctions.kt** - Core camera capture functions (photo and video)
+- **GalleryFunctions.kt** - Gallery/media picker operations
+- **CameraCoordinator.kt** - Activity lifecycle and camera intent management
+- **CameraForegroundService.kt** - Background service for video recording
+
+## iOS Implementation
+
+### Minimum Version
+
+iOS **18.2** or higher is required.
+
+### Info.plist Requirements
+
+The following privacy descriptions are required in your app's Info.plist:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>This app requires camera access to take photos and videos.</string>
+
+<key>NSMicrophoneUsageDescription</key>
+<string>This app requires microphone access to record video with audio.</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>This app requires photo library access to select media.</string>
+```
+
+<Note>
+You can customize these descriptions to better explain why your specific app needs these permissions.
+</Note>
+
+### UIImagePickerController
+
+For photo capture and video recording, iOS uses the native `UIImagePickerController`:
+
+- **Photos:** Source type `.camera` with media types `[UTType.image.identifier]`
+- **Videos:** Source type `.camera` with media types `[UTType.movie.identifier]`
+- **Quality:** High quality (`.typeHigh`) for videos
+- **Max Duration:** Configurable via `videoMaximumDuration` property
+
+### PHPickerViewController
+
+For gallery picking, iOS uses the modern `PHPickerViewController`:
+
+- More privacy-friendly than the older photo library picker
+- Supports filtering by media type (images, videos, or both)
+- Supports multiple selection with configurable limits
+- Uses `preferredAssetRepresentationMode: .current` for optimal performance
+
+### Native Classes
+
+- **CameraFunctions.swift** - All bridge functions (photo, video, gallery)
+- **CameraPhotoDelegate** - UIImagePickerController delegate for photos
+- **CameraVideoDelegate** - UIImagePickerController delegate for videos
+- **CameraGalleryManager** - PHPickerViewController delegate for gallery
+
+### Permission Handling
+
+iOS explicitly checks `AVCaptureDevice.authorizationStatus(for: .video)` before presenting the camera:
+
+<Steps>
+  <Step title="Check Current Status">
+    Checks if permission is `.authorized`, `.notDetermined`, `.denied`, or `.restricted`
+  </Step>
+  <Step title="Request if Needed">
+    If `.notDetermined`, calls `AVCaptureDevice.requestAccess(for: .video)`
+  </Step>
+  <Step title="Handle Denial">
+    Fires `PermissionDenied` event if permission is denied or restricted
+  </Step>
+  <Step title="Present Camera">
+    Only proceeds to show camera UI if permission is granted
+  </Step>
+</Steps>
+
+## Cross-Platform Differences
+
+<AccordionGroup>
+  <Accordion title="File Storage Paths">
+    **Android** uses the app's cache directory:
+    - Photos: `{cache}/captured.jpg`
+    - Videos: `{cache}/video_{timestamp}.mp4`
+    
+    **iOS** uses the temporary directory:
+    - Photos: `{temp}/captured_photo_{timestamp}.jpg`
+    - Videos: `{temp}/captured_video_{timestamp}.mp4`
+  </Accordion>
+  
+  <Accordion title="Permission Timing">
+    **Android** permissions are typically requested at app install time or when first accessing the camera.
+    
+    **iOS** explicitly checks and requests permissions before each camera operation.
+  </Accordion>
+  
+  <Accordion title="Background Recording">
+    **Android** uses a foreground service to support background video recording.
+    
+    **iOS** recording stops automatically if the app is backgrounded.
+  </Accordion>
+  
+  <Accordion title="iCloud Backup">
+    **Android** uses cache directory which is excluded from backups by default.
+    
+    **iOS** explicitly sets `isExcludedFromBackup = true` on all captured files.
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Tips
+
+### Android
+
+```bash
+# View camera-related logs
+adb logcat | grep -E "Camera|GetPhoto|RecordVideo"
+
+# Check permissions
+adb shell dumpsys package <your.package.name> | grep permission
+```
+
+### iOS
+
+- Use Xcode's Console to view Swift print statements
+- Look for emoji prefixes: 📸 (photo), 🎥 (video), 🖼️ (gallery), ❌ (errors)
+- Check Info.plist contains all required usage descriptions
+
+<Tip>
+Both platforms include extensive logging with emoji markers to make debugging easier. Enable debug output in your development environment to see detailed operation logs.
+</Tip>

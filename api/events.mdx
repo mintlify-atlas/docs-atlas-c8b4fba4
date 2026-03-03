@@ -1,0 +1,263 @@
+---
+title: 'Events'
+description: 'Complete reference for all camera plugin events and their payloads'
+---
+
+## Overview
+
+All camera operations communicate results through events. Each event contains a payload with relevant data about the operation result.
+
+## PhotoTaken
+
+Fired when a photo is successfully captured with the camera.
+
+**Event Class**: `Native\Mobile\Events\Camera\PhotoTaken`
+
+### Payload
+
+<ResponseField name="path" type="string" required>
+  Absolute file path to the captured photo. The photo is saved as a JPEG file in the app's temporary directory.
+  
+  - **Android**: `{cache}/captured.jpg`
+  - **iOS**: `~/Library/Application Support/Photos/captured.jpg`
+</ResponseField>
+
+<ResponseField name="mimeType" type="string" required>
+  MIME type of the captured photo. Always `"image/jpeg"` for camera captures.
+</ResponseField>
+
+<ResponseField name="id" type="string" optional>
+  The identifier that was passed to `getPhoto()` via the `id()` method. Only present if an ID was specified.
+</ResponseField>
+
+### Example Payloads
+
+```json
+{
+  "path": "/data/user/0/com.example.app/cache/captured.jpg",
+  "mimeType": "image/jpeg"
+}
+```
+
+```json
+{
+  "path": "/var/mobile/Containers/Data/Application/.../Library/Application Support/Photos/captured.jpg",
+  "mimeType": "image/jpeg",
+  "id": "profile-photo"
+}
+```
+
+---
+
+## PhotoCancelled
+
+Fired when the user cancels photo capture without taking a picture.
+
+**Event Class**: `Native\Mobile\Events\Camera\PhotoCancelled`
+
+### Payload
+
+<ResponseField name="cancelled" type="boolean" required>
+  Always `true` to indicate the operation was cancelled.
+</ResponseField>
+
+<ResponseField name="id" type="string" optional>
+  The identifier that was passed to `getPhoto()` via the `id()` method. Only present if an ID was specified.
+</ResponseField>
+
+### Example Payload
+
+```json
+{
+  "cancelled": true,
+  "id": "profile-photo"
+}
+```
+
+---
+
+## VideoRecorded
+
+Fired when a video is successfully recorded with the camera.
+
+**Event Class**: `Native\Mobile\Events\Camera\VideoRecorded`
+
+### Payload
+
+<ResponseField name="path" type="string" required>
+  Absolute file path to the recorded video. Videos are saved as MP4 files with timestamps in the filename.
+  
+  - **Android**: `{cache}/video_{timestamp}.mp4`
+  - **iOS**: `~/Library/Application Support/Videos/captured_video_{timestamp}.mp4`
+</ResponseField>
+
+<ResponseField name="mimeType" type="string" required>
+  MIME type of the recorded video. Typically `"video/mp4"`, but may vary based on the file extension.
+</ResponseField>
+
+<ResponseField name="id" type="string" optional>
+  The identifier that was passed to `recordVideo()` via the `id()` method. Only present if an ID was specified.
+</ResponseField>
+
+### Example Payloads
+
+```json
+{
+  "path": "/data/user/0/com.example.app/cache/video_1709467890123.mp4",
+  "mimeType": "video/mp4"
+}
+```
+
+```json
+{
+  "path": "/var/mobile/Containers/Data/Application/.../captured_video_1709467890456.mp4",
+  "mimeType": "video/mp4",
+  "id": "tutorial-video"
+}
+```
+
+---
+
+## VideoCancelled
+
+Fired when the user cancels video recording without completing it.
+
+**Event Class**: `Native\Mobile\Events\Camera\VideoCancelled`
+
+### Payload
+
+<ResponseField name="cancelled" type="boolean" required>
+  Always `true` to indicate the operation was cancelled.
+</ResponseField>
+
+<ResponseField name="id" type="string" optional>
+  The identifier that was passed to `recordVideo()` via the `id()` method. Only present if an ID was specified.
+</ResponseField>
+
+### Example Payload
+
+```json
+{
+  "cancelled": true,
+  "id": "intro-video"
+}
+```
+
+---
+
+## MediaSelected
+
+Fired when media is selected from the device gallery, or when the gallery picker is cancelled.
+
+**Event Class**: `Native\Mobile\Events\Gallery\MediaSelected`
+
+### Payload
+
+<ResponseField name="success" type="boolean" required>
+  `true` if files were selected, `false` if the user cancelled without selecting anything.
+</ResponseField>
+
+<ResponseField name="files" type="array" required>
+  Array of selected file objects. Each object contains:
+  - `path` (string): Absolute file path
+  - `mimeType` (string): MIME type (e.g., `"image/jpeg"`, `"video/mp4"`)
+  - `extension` (string): File extension (e.g., `"jpg"`, `"mp4"`)
+  - `type` (string): Media type category (`"image"` or `"video"`)
+  
+  Empty array if `success` is `false`.
+</ResponseField>
+
+<ResponseField name="count" type="int" required>
+  Total number of files selected. `0` if cancelled.
+</ResponseField>
+
+<ResponseField name="cancelled" type="boolean" optional>
+  Only present when `success` is `false`. Always `true` when present.
+</ResponseField>
+
+<ResponseField name="id" type="string" optional>
+  The identifier that was passed to `pickImages()` via the `id()` method. Only present if an ID was specified.
+</ResponseField>
+
+### Example Payloads
+
+**Successful Selection**:
+
+```json
+{
+  "success": true,
+  "files": [
+    {
+      "path": "/var/mobile/.../Gallery/gallery_selected_1709467890123_0.jpg",
+      "mimeType": "image/jpeg",
+      "extension": "jpg",
+      "type": "image"
+    },
+    {
+      "path": "/var/mobile/.../Gallery/gallery_selected_1709467890124_1.mp4",
+      "mimeType": "video/mp4",
+      "extension": "mp4",
+      "type": "video"
+    }
+  ],
+  "count": 2
+}
+```
+
+**Cancelled**:
+
+```json
+{
+  "success": false,
+  "files": [],
+  "count": 0,
+  "cancelled": true,
+  "id": "gallery-selection"
+}
+```
+
+---
+
+## PermissionDenied
+
+Fired when camera or microphone permissions are denied by the user (iOS only). Android handles permissions differently and will fail silently if permissions are not granted.
+
+**Event Class**: `Native\Mobile\Events\Camera\PermissionDenied`
+
+### Payload
+
+<ResponseField name="action" type="string" required>
+  The action that was attempted when permission was denied:
+  - `"photo"`: Camera permission denied for photo capture
+  - `"video"`: Camera or microphone permission denied for video recording
+</ResponseField>
+
+<ResponseField name="id" type="string" optional>
+  The identifier that was passed to the camera method via the `id()` method. Only present if an ID was specified.
+</ResponseField>
+
+### Example Payloads
+
+```json
+{
+  "action": "photo"
+}
+```
+
+```json
+{
+  "action": "video",
+  "id": "recording-session"
+}
+```
+
+### Platform Availability
+
+This event is **iOS only**. On Android, permission checks should be performed before calling camera methods. The plugin requires the following permissions in `config/nativephp.php`:
+
+- `android.permission.CAMERA`
+- `android.permission.RECORD_AUDIO` (for video)
+
+## Event Handling
+
+See the [PHP API](/api/php-api) and [JavaScript API](/api/javascript-api) pages for detailed examples of handling these events in your application.

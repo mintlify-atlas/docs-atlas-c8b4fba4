@@ -1,0 +1,241 @@
+---
+title: Storage locations
+description: Understanding where captured photos and videos are stored on each platform
+---
+
+The Camera plugin stores captured media in platform-specific temporary directories. Understanding these locations helps with file management and debugging.
+
+## Photo Storage
+
+### Android
+
+Photos are stored in the app's **cache directory**:
+
+```
+{cache}/captured.jpg
+```
+
+- **Format:** JPEG
+- **Location:** `Context.getCacheDir()`
+- **Filename:** Always `captured.jpg` (overwrites previous captures)
+- **Backup:** Excluded from backups by default (cache directory)
+
+### iOS
+
+Photos are stored in the **temporary directory**:
+
+```
+~/Library/Application Support/Photos/captured.jpg
+```
+
+Actually stored in the system temp directory with timestamp:
+
+```
+{temp}/captured_photo_{timestamp}.jpg
+```
+
+- **Format:** JPEG with 90% compression quality
+- **Location:** `FileManager.default.temporaryDirectory`
+- **Filename:** `captured_photo_<timestamp>.jpg` where timestamp is milliseconds since epoch
+- **Backup:** Explicitly excluded via `URLResourceValues.isExcludedFromBackup = true`
+
+<Note>
+The README mentions Application Support, but the actual Swift implementation uses `FileManager.default.temporaryDirectory` for optimal performance and automatic cleanup.
+</Note>
+
+## Video Storage
+
+### Android
+
+Videos are stored in the app's **cache directory**:
+
+```
+{cache}/video_{timestamp}.mp4
+```
+
+- **Format:** MP4
+- **Location:** `Context.getCacheDir()`
+- **Filename:** `video_<timestamp>.mp4` where timestamp is milliseconds since epoch
+- **Backup:** Excluded from backups by default (cache directory)
+
+### iOS
+
+Videos are stored in the **temporary directory**:
+
+```
+{temp}/captured_video_{timestamp}.mp4
+```
+
+- **Format:** MP4 (or original extension from camera)
+- **Location:** `FileManager.default.temporaryDirectory`
+- **Filename:** `captured_video_<timestamp>.<ext>`
+- **Quality:** High quality recording
+- **Backup:** Explicitly excluded via `URLResourceValues.isExcludedFromBackup = true`
+
+<Tip>
+iOS uses `moveItem` instead of `copyItem` when saving videos from the camera to improve performance, as the temporary file would be deleted anyway.
+</Tip>
+
+## Gallery Picked Media
+
+### iOS
+
+Files picked from the gallery are copied to a **Gallery** subdirectory within temp:
+
+```
+{temp}/Gallery/gallery_selected_{timestamp}_{index}.{ext}
+```
+
+- **Location:** `FileManager.default.temporaryDirectory.appendingPathComponent("Gallery")`
+- **Filename:** `gallery_selected_<timestamp>_<index>.<extension>`
+- **Format:** Original file extension preserved (jpg, png, mp4, mov, etc.)
+- **Multiple Files:** Index suffix (0, 1, 2...) when multiple items selected
+
+## File Formats and MIME Types
+
+### Photos
+
+| Platform | Format | MIME Type | Compression |
+|----------|--------|-----------|-------------|
+| Android | JPEG | `image/jpeg` | Camera default |
+| iOS | JPEG | `image/jpeg` | 90% quality |
+
+### Videos
+
+| Platform | Format | MIME Type | Quality |
+|----------|--------|-----------|----------|
+| Android | MP4 | `video/mp4` | High |
+| iOS | MP4/MOV | `video/mp4` or `video/<ext>` | `.typeHigh` |
+
+<Info>
+iOS preserves the original file extension from the camera, which may be `.mp4` or `.mov` depending on device settings.
+</Info>
+
+### Gallery Media
+
+Gallery media MIME types are determined by file extension:
+
+```swift
+switch fileExtension.lowercased() {
+case "jpg", "jpeg":
+    return "image/jpeg"
+case "png":
+    return "image/png"
+case "gif":
+    return "image/gif"
+case "webp":
+    return "image/webp"
+case "mp4":
+    return "video/mp4"
+case "mov":
+    return "video/quicktime"
+case "avi":
+    return "video/avi"
+case "webm":
+    return "video/webm"
+default:
+    return "application/octet-stream"
+}
+```
+
+## File Lifecycle
+
+<Steps>
+  <Step title="Capture">
+    Camera captures photo/video to native temporary location
+  </Step>
+  <Step title="Save">
+    File is saved/moved to plugin's temporary directory with timestamped filename
+  </Step>
+  <Step title="Event">
+    Event is fired with the file path
+  </Step>
+  <Step title="Your Code">
+    Your event handler receives the path and can process/move the file
+  </Step>
+  <Step title="Cleanup">
+    If you don't move the file, it remains in temp until OS cleanup or app reinstall
+  </Step>
+</Steps>
+
+<Warning>
+Files in temporary directories are not guaranteed to persist. Move important captures to permanent storage (like Laravel's `storage/app` directory) in your event handlers.
+</Warning>
+
+## Best Practices
+
+### Move Files to Permanent Storage
+
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Illuminate\Support\Facades\Storage;
+
+#[OnNative(PhotoTaken::class)]
+public function handlePhotoTaken(string $path)
+{
+    // Generate a permanent filename
+    $filename = 'photos/' . uniqid() . '.jpg';
+    
+    // Move to Laravel storage
+    Storage::put($filename, file_get_contents($path));
+    
+    // Delete temporary file
+    @unlink($path);
+    
+    // Store the permanent path
+    $this->photoPath = Storage::path($filename);
+}
+```
+
+### Check File Existence
+
+```php
+#[OnNative(VideoRecorded::class)]
+public function handleVideoRecorded(string $path, string $mimeType, ?string $id)
+{
+    if (!file_exists($path)) {
+        Log::error('Video file not found', ['path' => $path]);
+        return;
+    }
+    
+    $fileSize = filesize($path);
+    // Process the video...
+}
+```
+
+### Clean Up After Processing
+
+```javascript
+import { On, Events } from '#nativephp';
+import axios from 'axios';
+
+On(Events.Camera.PhotoTaken, async (payload) => {
+  // Upload to server
+  const formData = new FormData();
+  const blob = await fetch(`file://${payload.path}`).then(r => r.blob());
+  formData.append('photo', blob);
+  
+  await axios.post('/api/upload', formData);
+  
+  // The OS will eventually clean up the temp file
+  // No explicit deletion needed from JavaScript
+});
+```
+
+## Platform Differences Summary
+
+<CardGroup cols={2}>
+  <Card title="Android" icon="android">
+    - Uses cache directory
+    - Simple filenames for photos
+    - Timestamp-based filenames for videos
+    - Automatic backup exclusion
+  </Card>
+  <Card title="iOS" icon="apple">
+    - Uses temporary directory
+    - Timestamp-based filenames for all media
+    - Explicit backup exclusion
+    - Move operation for videos (faster)
+  </Card>
+</CardGroup>

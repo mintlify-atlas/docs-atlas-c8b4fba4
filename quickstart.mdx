@@ -1,80 +1,522 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get up and running with the Camera Plugin in minutes
 ---
 
-## Get started in three steps
+# Quick Start Guide
 
-Get your documentation site running locally and make your first customization.
+Learn how to capture photos, record videos, and pick media from the gallery with the Camera Plugin.
 
-### Step 1: Set up your local environment
+## Basic Photo Capture
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+The simplest way to capture a photo is with a single method call:
+
+<Tabs>
+  <Tab title="PHP (Livewire/Blade)">
+    ```php
+    use Native\Mobile\Facades\Camera;
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PhotoTaken;
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    class PhotoComponent extends Component
+    {
+        public string $photoPath = '';
+        
+        public function capturePhoto()
+        {
+            // Launch camera to take a photo
+            Camera::getPhoto();
+        }
+        
+        #[OnNative(PhotoTaken::class)]
+        public function handlePhotoTaken(string $path)
+        {
+            // Photo captured successfully
+            $this->photoPath = $path;
+            $this->processPhoto($path);
+        }
+        
+        private function processPhoto(string $path)
+        {
+            // Upload to storage, process, etc.
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript (Vue/React)">
+    ```javascript
+    import { Camera, On, Off, Events } from '#nativephp';
+    import { ref, onMounted, onUnmounted } from 'vue';
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    const photoPath = ref('');
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    const capturePhoto = async () => {
+        // Launch camera to take a photo
+        await Camera.getPhoto();
+    };
+    
+    const handlePhotoTaken = (payload) => {
+        // Photo captured successfully
+        photoPath.value = payload.path;
+        processPhoto(payload.path);
+    };
+    
+    const processPhoto = (path) => {
+        // Upload to storage, process, etc.
+        console.log('Photo saved at:', path);
+    };
+    
+    onMounted(() => {
+        On(Events.Camera.PhotoTaken, handlePhotoTaken);
+    });
+    
+    onUnmounted(() => {
+        Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+    });
+    ```
+  </Tab>
+</Tabs>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Recording Videos
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Record videos with optional duration limits:
 
-### Step 3: Go live
+<Steps>
+  <Step title="Basic Video Recording">
+    <Tabs>
+      <Tab title="PHP">
+        ```php
+        use Native\Mobile\Facades\Camera;
+        
+        // Simple video recording
+        Camera::recordVideo();
+        
+        // With maximum duration (30 seconds)
+        Camera::recordVideo(['maxDuration' => 30]);
+        ```
+      </Tab>
+      
+      <Tab title="JavaScript">
+        ```javascript
+        import { Camera } from '#nativephp';
+        
+        // Simple video recording
+        await Camera.recordVideo();
+        
+        // With maximum duration (60 seconds)
+        await Camera.recordVideo()
+            .maxDuration(60);
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Using Fluent API">
+    The fluent API allows method chaining for cleaner code:
+    
+    <Tabs>
+      <Tab title="PHP">
+        ```php
+        use Native\Mobile\Facades\Camera;
+        
+        Camera::recordVideo()
+            ->maxDuration(60)
+            ->id('my-video-123')
+            ->start();
+        ```
+      </Tab>
+      
+      <Tab title="JavaScript">
+        ```javascript
+        import { Camera } from '#nativephp';
+        
+        await Camera.recordVideo()
+            .maxDuration(60)
+            .id('my-video-123');
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Handle Video Events">
+    <Tabs>
+      <Tab title="PHP">
+        ```php
+        use Native\Mobile\Attributes\OnNative;
+        use Native\Mobile\Events\Camera\VideoRecorded;
+        use Native\Mobile\Events\Camera\VideoCancelled;
+        
+        #[OnNative(VideoRecorded::class)]
+        public function handleVideoRecorded(string $path, string $mimeType, ?string $id)
+        {
+            // Video recorded successfully
+            $this->videoPath = $path;
+            $this->uploadVideo($path);
+        }
+        
+        #[OnNative(VideoCancelled::class)]
+        public function handleVideoCancelled(?string $id)
+        {
+            // User cancelled recording
+            $this->notify('Video recording cancelled');
+        }
+        ```
+      </Tab>
+      
+      <Tab title="JavaScript">
+        ```javascript
+        import { On, Off, Events } from '#nativephp';
+        
+        const handleVideoRecorded = (payload) => {
+            console.log('Video path:', payload.path);
+            console.log('MIME type:', payload.mimeType);
+            console.log('ID:', payload.id);
+            uploadVideo(payload.path);
+        };
+        
+        const handleVideoCancelled = (payload) => {
+            console.log('Recording cancelled, ID:', payload.id);
+        };
+        
+        onMounted(() => {
+            On(Events.Camera.VideoRecorded, handleVideoRecorded);
+            On(Events.Camera.VideoCancelled, handleVideoCancelled);
+        });
+        
+        onUnmounted(() => {
+            Off(Events.Camera.VideoRecorded, handleVideoRecorded);
+            Off(Events.Camera.VideoCancelled, handleVideoCancelled);
+        });
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Gallery Picker
 
-## Next steps
+Let users select existing photos or videos from their device:
 
-Now that you have your docs running, explore these key features:
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Gallery\MediaSelected;
+    
+    // Pick a single image
+    Camera::pickImages('images', false);
+    
+    // Pick multiple images
+    Camera::pickImages('images', true);
+    
+    // Pick any media type (images or videos)
+    Camera::pickImages('all', true);
+    
+    #[OnNative(MediaSelected::class)]
+    public function handleMediaSelected($success, $files, $count)
+    {
+        if ($success) {
+            foreach ($files as $file) {
+                $this->processMedia($file);
+            }
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    import { Camera, On, Events } from '#nativephp';
+    
+    // Pick a single image
+    await Camera.pickImages()
+        .images();
+    
+    // Pick multiple images (max 5)
+    await Camera.pickImages()
+        .images()
+        .multiple()
+        .maxItems(5);
+    
+    // Pick any media type
+    await Camera.pickImages()
+        .all()
+        .multiple();
+    
+    const handleMediaSelected = (payload) => {
+        if (payload.success) {
+            console.log(`Selected ${payload.count} files`);
+            payload.files.forEach(file => {
+                console.log('Path:', file.path);
+                console.log('Type:', file.mimeType);
+                processMedia(file);
+            });
+        }
+    };
+    
+    onMounted(() => {
+        On(Events.Gallery.MediaSelected, handleMediaSelected);
+    });
+    ```
+  </Tab>
+</Tabs>
 
-<CardGroup cols={2}>
+## Tracking Operations with IDs
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+Use optional IDs to track which operation triggered an event:
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+    
+    // Capture profile picture
+    Camera::getPhoto(['id' => 'profile-pic']);
+    
+    // Capture cover photo
+    Camera::getPhoto(['id' => 'cover-photo']);
+    
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path, ?string $id)
+    {
+        if ($id === 'profile-pic') {
+            $this->updateProfilePicture($path);
+        } elseif ($id === 'cover-photo') {
+            $this->updateCoverPhoto($path);
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    import { Camera } from '#nativephp';
+    
+    // Capture profile picture
+    await Camera.getPhoto()
+        .id('profile-pic');
+    
+    // Capture cover photo
+    await Camera.getPhoto()
+        .id('cover-photo');
+    
+    const handlePhotoTaken = (payload) => {
+        if (payload.id === 'profile-pic') {
+            updateProfilePicture(payload.path);
+        } else if (payload.id === 'cover-photo') {
+            updateCoverPhoto(payload.path);
+        }
+    };
+    ```
+  </Tab>
+</Tabs>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+## Handling Permission Denials
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+Gracefully handle cases where the user denies camera permission:
 
-</CardGroup>
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PermissionDenied;
+    
+    #[OnNative(PermissionDenied::class)]
+    public function handlePermissionDenied(string $action, ?string $id)
+    {
+        // Show user-friendly message
+        $this->notify(
+            'Camera permission is required to take photos. ' .
+            'Please enable it in your device settings.'
+        );
+    }
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    import { On, Events } from '#nativephp';
+    
+    const handlePermissionDenied = (payload) => {
+        alert(
+            'Camera permission is required. ' +
+            'Please enable it in your device settings.'
+        );
+        console.log('Action:', payload.action);
+        console.log('ID:', payload.id);
+    };
+    
+    onMounted(() => {
+        On(Events.Camera.PermissionDenied, handlePermissionDenied);
+    });
+    ```
+  </Tab>
+</Tabs>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+**Permissions are required!** Make sure you've enabled the `camera` permission in `config/nativephp.php` as described in the [Installation](/installation) guide.
 </Note>
+
+## Complete Example
+
+Here's a complete example combining photos, videos, and gallery picker:
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    <?php
+    
+    namespace App\Livewire;
+    
+    use Livewire\Component;
+    use Native\Mobile\Facades\Camera;
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PhotoTaken;
+    use Native\Mobile\Events\Camera\VideoRecorded;
+    use Native\Mobile\Events\Gallery\MediaSelected;
+    
+    class MediaCapture extends Component
+    {
+        public array $photos = [];
+        public array $videos = [];
+        
+        public function takePhoto()
+        {
+            Camera::getPhoto();
+        }
+        
+        public function recordVideo()
+        {
+            Camera::recordVideo()
+                ->maxDuration(60)
+                ->start();
+        }
+        
+        public function pickFromGallery()
+        {
+            Camera::pickImages('all', true);
+        }
+        
+        #[OnNative(PhotoTaken::class)]
+        public function handlePhotoTaken(string $path)
+        {
+            $this->photos[] = $path;
+        }
+        
+        #[OnNative(VideoRecorded::class)]
+        public function handleVideoRecorded(string $path)
+        {
+            $this->videos[] = $path;
+        }
+        
+        #[OnNative(MediaSelected::class)]
+        public function handleMediaSelected($success, $files, $count)
+        {
+            if ($success) {
+                foreach ($files as $file) {
+                    if ($file['type'] === 'image') {
+                        $this->photos[] = $file['path'];
+                    } else {
+                        $this->videos[] = $file['path'];
+                    }
+                }
+            }
+        }
+        
+        public function render()
+        {
+            return view('livewire.media-capture');
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript (Vue)">
+    ```vue
+    <script setup>
+    import { ref, onMounted, onUnmounted } from 'vue';
+    import { Camera, On, Off, Events } from '#nativephp';
+    
+    const photos = ref([]);
+    const videos = ref([]);
+    
+    const takePhoto = async () => {
+        await Camera.getPhoto();
+    };
+    
+    const recordVideo = async () => {
+        await Camera.recordVideo()
+            .maxDuration(60);
+    };
+    
+    const pickFromGallery = async () => {
+        await Camera.pickImages()
+            .all()
+            .multiple();
+    };
+    
+    const handlePhotoTaken = (payload) => {
+        photos.value.push(payload.path);
+    };
+    
+    const handleVideoRecorded = (payload) => {
+        videos.value.push(payload.path);
+    };
+    
+    const handleMediaSelected = (payload) => {
+        if (payload.success) {
+            payload.files.forEach(file => {
+                if (file.type === 'image') {
+                    photos.value.push(file.path);
+                } else {
+                    videos.value.push(file.path);
+                }
+            });
+        }
+    };
+    
+    onMounted(() => {
+        On(Events.Camera.PhotoTaken, handlePhotoTaken);
+        On(Events.Camera.VideoRecorded, handleVideoRecorded);
+        On(Events.Gallery.MediaSelected, handleMediaSelected);
+    });
+    
+    onUnmounted(() => {
+        Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+        Off(Events.Camera.VideoRecorded, handleVideoRecorded);
+        Off(Events.Gallery.MediaSelected, handleMediaSelected);
+    });
+    </script>
+    
+    <template>
+        <div>
+            <button @click="takePhoto">Take Photo</button>
+            <button @click="recordVideo">Record Video</button>
+            <button @click="pickFromGallery">Pick from Gallery</button>
+            
+            <div v-for="photo in photos" :key="photo">
+                <img :src="photo" alt="Captured photo" />
+            </div>
+            
+            <div v-for="video in videos" :key="video">
+                <video :src="video" controls></video>
+            </div>
+        </div>
+    </template>
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Explore all methods, parameters, and events
+  </Card>
+  
+  <Card title="Events Guide" icon="bolt" href="/api/events">
+    Learn about all available camera events
+  </Card>
+</CardGroup>

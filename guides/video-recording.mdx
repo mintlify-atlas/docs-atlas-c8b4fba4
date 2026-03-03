@@ -1,0 +1,389 @@
+---
+title: Video Recording
+description: Record videos using the device camera with the NativePHP Camera Plugin
+---
+
+Record videos from your mobile app using the device camera. The Camera API provides both simple and fluent interfaces for video recording with customizable options.
+
+## Basic Video Recording
+
+Use the `Camera::recordVideo()` method to open the device camera and record a video.
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Record a video
+    Camera::recordVideo();
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Record a video
+    await Camera.recordVideo();
+    ```
+  </Tab>
+</Tabs>
+
+## Setting Maximum Duration
+
+Limit the recording duration by specifying the maximum duration in seconds.
+
+<Tabs>
+  <Tab title="PHP (Array Syntax)">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Record with max duration (30 seconds)
+    Camera::recordVideo(['maxDuration' => 30]);
+    ```
+  </Tab>
+  <Tab title="PHP (Fluent API)">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Using fluent API
+    Camera::recordVideo()
+        ->maxDuration(60)
+        ->start();
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Record video with 60 second limit
+    await Camera.recordVideo()
+        .maxDuration(60);
+    ```
+  </Tab>
+</Tabs>
+
+## PendingVideoRecorder Fluent API
+
+The `recordVideo()` method returns a `PendingVideoRecorder` instance that provides a fluent interface for configuring the recording.
+
+### Available Methods
+
+<ParamField path="maxDuration" type="int">
+  Set the maximum recording duration in seconds.
+
+  ```php
+  Camera::recordVideo()->maxDuration(60)->start();
+  ```
+</ParamField>
+
+<ParamField path="id" type="string">
+  Set a unique identifier for this recording to correlate with events.
+
+  ```php
+  Camera::recordVideo()->id('my-video-123')->start();
+  ```
+</ParamField>
+
+<ParamField path="event" type="string">
+  Set a custom event class to dispatch when recording completes.
+
+  ```php
+  Camera::recordVideo()->event(MyCustomVideoEvent::class)->start();
+  ```
+</ParamField>
+
+<ParamField path="remember" type="void">
+  Store the recorder's ID in the session for later retrieval.
+
+  ```php
+  Camera::recordVideo()->id('session-video')->remember()->start();
+  ```
+</ParamField>
+
+<ParamField path="start" type="void">
+  Explicitly start the video recording. Call this as the final method in the chain.
+
+  ```php
+  Camera::recordVideo()->maxDuration(30)->start();
+  ```
+</ParamField>
+
+### Complete Fluent Example
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Using fluent API with multiple options
+    Camera::recordVideo()
+        ->maxDuration(60)
+        ->id('my-video-123')
+        ->start();
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Fluent API in JavaScript
+    await Camera.recordVideo()
+        .maxDuration(60)
+        .id('my-video-123');
+    ```
+  </Tab>
+</Tabs>
+
+## Handling Video Events
+
+The Camera Plugin fires events when videos are recorded or cancelled. Listen for these events to process the recorded videos.
+
+### VideoRecorded Event
+
+Fired when a video is successfully recorded.
+
+**Event Payload:**
+- `string $path` - File path to the recorded video
+- `string $mimeType` - Video MIME type (default: `'video/mp4'`)
+- `?string $id` - Optional identifier if set via `id()` method
+
+<Tabs>
+  <Tab title="PHP (Livewire)">
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\VideoRecorded;
+
+    #[OnNative(VideoRecorded::class)]
+    public function handleVideoRecorded(string $path, string $mimeType, ?string $id = null)
+    {
+        // Process the recorded video
+        $this->processVideo($path, $mimeType);
+        
+        if ($id === 'my-video-123') {
+            // Handle specific video
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```js
+    import { On, Off, Events } from '#nativephp';
+    import { ref, onMounted, onUnmounted } from 'vue';
+
+    const videoPath = ref('');
+
+    const handleVideoRecorded = (payload) => {
+        videoPath.value = payload.path;
+        console.log('Video recorded:', payload.path);
+        console.log('MIME type:', payload.mimeType);
+        
+        if (payload.id === 'my-video-123') {
+            // Handle specific video
+        }
+    };
+
+    onMounted(() => {
+        On(Events.Camera.VideoRecorded, handleVideoRecorded);
+    });
+
+    onUnmounted(() => {
+        Off(Events.Camera.VideoRecorded, handleVideoRecorded);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### VideoCancelled Event
+
+Fired when video recording is cancelled by the user.
+
+**Event Payload:**
+- `bool $cancelled` - Always `true`
+- `?string $id` - Optional identifier if set via `id()` method
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\VideoCancelled;
+
+    #[OnNative(VideoCancelled::class)]
+    public function handleVideoCancelled(?string $id = null)
+    {
+        // Handle cancellation
+        $this->notify('Video recording was cancelled');
+    }
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { On, Events } from '#nativephp';
+
+    On(Events.Camera.VideoCancelled, (payload) => {
+        console.log('Video recording cancelled');
+        if (payload.id) {
+            console.log('Cancelled video ID:', payload.id);
+        }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## File Format and Storage
+
+<AccordionGroup>
+  <Accordion title="File Format">
+    All recorded videos are saved in **MP4 format** with high quality settings.
+
+    - **MIME Type:** `video/mp4`
+    - **File Extension:** `.mp4`
+    - **Quality:** High (platform-specific encoding)
+  </Accordion>
+
+  <Accordion title="Storage Locations">
+    Videos are stored in platform-specific temporary directories with timestamp-based filenames:
+
+    **Android:**
+    - Location: App cache directory
+    - Path format: `{cache}/video_{timestamp}.mp4`
+
+    **iOS:**
+    - Location: Temporary directory
+    - Path format: `~/Library/Caches/captured_video_{timestamp}.mp4`
+    - Files are excluded from iCloud/iTunes backup
+
+    <Note>
+      Videos are stored in temporary directories. If you need to keep them permanently, copy them to your app's storage directory after receiving the VideoRecorded event.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+## Permissions
+
+<Warning>
+  Camera and microphone permissions are required to record videos. If permission is denied, the operation will fail and a `PermissionDenied` event will be fired.
+</Warning>
+
+See the [Permissions guide](/guides/permissions) for details on configuring camera and microphone permissions.
+
+## Complete Example
+
+Here's a complete example showing video recording with event handling:
+
+<Tabs>
+  <Tab title="PHP (Livewire)">
+    ```php
+    <?php
+
+    namespace App\Livewire;
+
+    use Livewire\Component;
+    use Native\Mobile\Facades\Camera;
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\VideoRecorded;
+    use Native\Mobile\Events\Camera\VideoCancelled;
+
+    class VideoRecorder extends Component
+    {
+        public $videoPath = null;
+        public $isRecording = false;
+
+        public function startRecording()
+        {
+            $this->isRecording = true;
+            
+            Camera::recordVideo()
+                ->maxDuration(60)
+                ->id('user-video')
+                ->start();
+        }
+
+        #[OnNative(VideoRecorded::class)]
+        public function handleVideoRecorded(string $path, string $mimeType, ?string $id = null)
+        {
+            if ($id === 'user-video') {
+                $this->videoPath = $path;
+                $this->isRecording = false;
+                
+                // Upload or process the video
+                $this->uploadVideo($path);
+            }
+        }
+
+        #[OnNative(VideoCancelled::class)]
+        public function handleVideoCancelled(?string $id = null)
+        {
+            $this->isRecording = false;
+            $this->dispatch('notify', 'Video recording cancelled');
+        }
+
+        private function uploadVideo(string $path)
+        {
+            // Your upload logic here
+        }
+
+        public function render()
+        {
+            return view('livewire.video-recorder');
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```vue
+    <script setup>
+    import { ref, onMounted, onUnmounted } from 'vue';
+    import { Camera, On, Off, Events } from '#nativephp';
+
+    const videoPath = ref(null);
+    const isRecording = ref(false);
+
+    const startRecording = async () => {
+        isRecording.value = true;
+        
+        await Camera.recordVideo()
+            .maxDuration(60)
+            .id('user-video');
+    };
+
+    const handleVideoRecorded = (payload) => {
+        if (payload.id === 'user-video') {
+            videoPath.value = payload.path;
+            isRecording.value = false;
+            
+            // Upload or process the video
+            uploadVideo(payload.path);
+        }
+    };
+
+    const handleVideoCancelled = (payload) => {
+        isRecording.value = false;
+        console.log('Video recording cancelled');
+    };
+
+    const uploadVideo = (path) => {
+        // Your upload logic here
+    };
+
+    onMounted(() => {
+        On(Events.Camera.VideoRecorded, handleVideoRecorded);
+        On(Events.Camera.VideoCancelled, handleVideoCancelled);
+    });
+
+    onUnmounted(() => {
+        Off(Events.Camera.VideoRecorded, handleVideoRecorded);
+        Off(Events.Camera.VideoCancelled, handleVideoCancelled);
+    });
+    </script>
+
+    <template>
+      <div>
+        <button @click="startRecording" :disabled="isRecording">
+          {{ isRecording ? 'Recording...' : 'Record Video' }}
+        </button>
+        <video v-if="videoPath" :src="videoPath" controls />
+      </div>
+    </template>
+    ```
+  </Tab>
+</Tabs>

@@ -1,0 +1,284 @@
+---
+title: Photo Capture
+description: Capture photos using the device camera with the NativePHP Camera Plugin
+---
+
+Capture photos from your mobile app using the device camera. The Camera API provides a simple interface to take photos and receive them via events.
+
+## Basic Photo Capture
+
+Use the `Camera::getPhoto()` method to open the device camera and capture a photo.
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Take a photo
+    Camera::getPhoto();
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Take a photo
+    await Camera.getPhoto();
+    ```
+  </Tab>
+</Tabs>
+
+## Tracking Photos with IDs
+
+You can assign an identifier to track specific photo capture operations. This is useful when you have multiple capture points in your app.
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Capture with identifier
+    Camera::getPhoto()->id('profile-pic');
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // With identifier for tracking
+    await Camera.getPhoto()
+        .id('profile-pic');
+    ```
+  </Tab>
+</Tabs>
+
+The `id` will be included in the event payload, allowing you to identify which capture operation completed.
+
+## Handling Photo Events
+
+The Camera Plugin fires events when photos are captured or cancelled. Listen for these events to process the captured photos.
+
+### PhotoTaken Event
+
+Fired when a photo is successfully captured.
+
+**Event Payload:**
+- `string $path` - File path to the captured photo
+- `string $mimeType` - Image MIME type (always `'image/jpeg'`)
+- `?string $id` - Optional identifier if set via `id()` method
+
+<Tabs>
+  <Tab title="PHP (Livewire)">
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PhotoTaken;
+
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path)
+    {
+        // Process the captured photo
+        $this->processPhoto($path);
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```js
+    import { On, Off, Events } from '#nativephp';
+    import { ref, onMounted, onUnmounted } from 'vue';
+
+    const photoPath = ref('');
+
+    const handlePhotoTaken = (payload) => {
+        photoPath.value = payload.path;
+        processPhoto(payload.path);
+    };
+
+    onMounted(() => {
+        On(Events.Camera.PhotoTaken, handlePhotoTaken);
+    });
+
+    onUnmounted(() => {
+        Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### PhotoCancelled Event
+
+Fired when the user cancels photo capture without taking a photo.
+
+**Event Payload:**
+- `bool $cancelled` - Always `true`
+- `?string $id` - Optional identifier if set via `id()` method
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PhotoCancelled;
+
+    #[OnNative(PhotoCancelled::class)]
+    public function handlePhotoCancelled()
+    {
+        // Handle cancellation
+        $this->notify('Photo capture was cancelled');
+    }
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { On, Events } from '#nativephp';
+
+    On(Events.Camera.PhotoCancelled, (payload) => {
+        console.log('Photo capture cancelled');
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## File Format and Storage
+
+<AccordionGroup>
+  <Accordion title="File Format">
+    All captured photos are saved in **JPEG format** with 90% compression quality for optimal quality and file size.
+
+    - **MIME Type:** `image/jpeg`
+    - **File Extension:** `.jpg`
+    - **Compression:** 90% quality
+  </Accordion>
+
+  <Accordion title="Storage Locations">
+    Photos are stored in platform-specific temporary directories:
+
+    **Android:**
+    - Location: App cache directory
+    - Path format: `{cache}/captured_photo_{timestamp}.jpg`
+
+    **iOS:**
+    - Location: Temporary directory
+    - Path format: `~/Library/Caches/captured_photo_{timestamp}.jpg`
+    - Files are excluded from iCloud/iTunes backup
+
+    <Note>
+      Photos are stored in temporary directories. If you need to keep them permanently, copy them to your app's storage directory after receiving the PhotoTaken event.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+## Permissions
+
+<Warning>
+  Camera permission is required to capture photos. If permission is denied, the operation will fail and a `PermissionDenied` event will be fired.
+</Warning>
+
+See the [Permissions guide](/guides/permissions) for details on configuring camera permissions.
+
+## Complete Example
+
+Here's a complete example showing photo capture with event handling:
+
+<Tabs>
+  <Tab title="PHP (Livewire)">
+    ```php
+    <?php
+
+    namespace App\Livewire;
+
+    use Livewire\Component;
+    use Native\Mobile\Facades\Camera;
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PhotoTaken;
+    use Native\Mobile\Events\Camera\PhotoCancelled;
+
+    class ProfilePhoto extends Component
+    {
+        public $photoPath = null;
+
+        public function capturePhoto()
+        {
+            Camera::getPhoto()->id('profile-pic');
+        }
+
+        #[OnNative(PhotoTaken::class)]
+        public function handlePhotoTaken(string $path, ?string $id = null)
+        {
+            if ($id === 'profile-pic') {
+                $this->photoPath = $path;
+                // Upload or process the photo
+                $this->uploadPhoto($path);
+            }
+        }
+
+        #[OnNative(PhotoCancelled::class)]
+        public function handlePhotoCancelled()
+        {
+            $this->dispatch('notify', 'Photo capture cancelled');
+        }
+
+        private function uploadPhoto(string $path)
+        {
+            // Your upload logic here
+        }
+
+        public function render()
+        {
+            return view('livewire.profile-photo');
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```vue
+    <script setup>
+    import { ref, onMounted, onUnmounted } from 'vue';
+    import { Camera, On, Off, Events } from '#nativephp';
+
+    const photoPath = ref(null);
+    const isCapturing = ref(false);
+
+    const capturePhoto = async () => {
+        isCapturing.value = true;
+        await Camera.getPhoto().id('profile-pic');
+    };
+
+    const handlePhotoTaken = (payload) => {
+        if (payload.id === 'profile-pic') {
+            photoPath.value = payload.path;
+            isCapturing.value = false;
+            // Upload or process the photo
+            uploadPhoto(payload.path);
+        }
+    };
+
+    const handlePhotoCancelled = () => {
+        isCapturing.value = false;
+        console.log('Photo capture cancelled');
+    };
+
+    const uploadPhoto = (path) => {
+        // Your upload logic here
+    };
+
+    onMounted(() => {
+        On(Events.Camera.PhotoTaken, handlePhotoTaken);
+        On(Events.Camera.PhotoCancelled, handlePhotoCancelled);
+    });
+
+    onUnmounted(() => {
+        Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+        Off(Events.Camera.PhotoCancelled, handlePhotoCancelled);
+    });
+    </script>
+
+    <template>
+      <div>
+        <button @click="capturePhoto" :disabled="isCapturing">
+          {{ isCapturing ? 'Opening Camera...' : 'Take Photo' }}
+        </button>
+        <img v-if="photoPath" :src="photoPath" alt="Captured photo" />
+      </div>
+    </template>
+    ```
+  </Tab>
+</Tabs>

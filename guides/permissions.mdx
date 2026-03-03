@@ -1,0 +1,335 @@
+---
+title: Permissions
+description: Configure camera, microphone, and photo library permissions for the NativePHP Camera Plugin
+---
+
+The Camera Plugin requires specific permissions to access device hardware and media libraries. This guide covers how to configure permissions for both Android and iOS platforms.
+
+## Overview
+
+Different camera operations require different permissions:
+
+- **Photo Capture:** Camera permission
+- **Video Recording:** Camera + Microphone permissions
+- **Gallery Picker:** Photo Library permission (iOS only)
+
+<Warning>
+  If required permissions are denied, camera operations will fail and a `PermissionDenied` event will be fired.
+</Warning>
+
+## Enabling Permissions in Config
+
+Enable the camera permission in your NativePHP configuration file:
+
+```php
+// config/nativephp.php
+
+return [
+    'permissions' => [
+        'camera' => true,
+    ],
+];
+```
+
+<Note>
+  Camera permission is required for photos, videos, **and** QR/barcode scanning. Make sure to enable it in your configuration.
+</Note>
+
+## Android Permissions
+
+The plugin automatically configures the following Android permissions in `nativephp.json`:
+
+```json
+{
+  "android": {
+    "min_version": 33,
+    "permissions": [
+      "android.permission.CAMERA",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.FOREGROUND_SERVICE_SHORT_SERVICE"
+    ]
+  }
+}
+```
+
+### Required Permissions
+
+<ParamField path="CAMERA" type="android.permission">
+  Required for photo capture and video recording. Allows access to the device camera.
+</ParamField>
+
+<ParamField path="RECORD_AUDIO" type="android.permission">
+  Required for video recording with audio. Allows recording audio from the microphone.
+</ParamField>
+
+<ParamField path="FOREGROUND_SERVICE" type="android.permission">
+  Required for background camera operations (Android 13+).
+</ParamField>
+
+<ParamField path="FOREGROUND_SERVICE_SHORT_SERVICE" type="android.permission">
+  Required for short-lived foreground services used during video recording (Android 14+).
+</ParamField>
+
+### Permission Behavior on Android
+
+- **API 33+:** Gallery picker does not require runtime permissions
+- **Runtime Permissions:** Camera and microphone permissions are requested at runtime when needed
+- **Permission Denied:** If the user denies permission, a `PermissionDenied` event is fired
+
+## iOS Permissions
+
+The plugin automatically configures the required iOS Info.plist entries in `nativephp.json`:
+
+```json
+{
+  "ios": {
+    "min_version": "18.2",
+    "info_plist": {
+      "NSCameraUsageDescription": "This app requires camera access to take photos and videos.",
+      "NSMicrophoneUsageDescription": "This app requires microphone access to record video with audio.",
+      "NSPhotoLibraryUsageDescription": "This app requires photo library access to select media."
+    }
+  }
+}
+```
+
+### Required Info.plist Entries
+
+<ParamField path="NSCameraUsageDescription" type="string">
+  **Camera Usage Description**
+  
+  Explains why your app needs camera access. This message is shown to users when requesting camera permission.
+  
+  **Default:** "This app requires camera access to take photos and videos."
+</ParamField>
+
+<ParamField path="NSMicrophoneUsageDescription" type="string">
+  **Microphone Usage Description**
+  
+  Explains why your app needs microphone access. This message is shown when requesting microphone permission for video recording.
+  
+  **Default:** "This app requires microphone access to record video with audio."
+</ParamField>
+
+<ParamField path="NSPhotoLibraryUsageDescription" type="string">
+  **Photo Library Usage Description**
+  
+  Explains why your app needs photo library access. This message is shown when requesting permission to access the photo library.
+  
+  **Default:** "This app requires photo library access to select media."
+</ParamField>
+
+### Customizing Permission Messages
+
+You can customize these messages in your `nativephp.json` file to better describe your app's specific use case:
+
+```json
+{
+  "ios": {
+    "info_plist": {
+      "NSCameraUsageDescription": "Take profile photos and scan QR codes",
+      "NSMicrophoneUsageDescription": "Record video messages with audio",
+      "NSPhotoLibraryUsageDescription": "Select photos to share with your friends"
+    }
+  }
+}
+```
+
+<Tip>
+  Write clear, user-friendly messages that explain the **benefit** to the user, not just what your app wants to access.
+</Tip>
+
+## Permission Denied Event
+
+When a user denies camera or microphone permission, a `PermissionDenied` event is fired.
+
+**Event Payload:**
+- `string $action` - The action that was attempted (`"photo"` or `"video"`)
+- `?string $id` - Optional identifier if set via `id()` method
+
+<Tabs>
+  <Tab title="PHP (Livewire)">
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PermissionDenied;
+
+    #[OnNative(PermissionDenied::class)]
+    public function handlePermissionDenied(string $action, ?string $id = null)
+    {
+        $message = match($action) {
+            'photo' => 'Camera permission is required to take photos',
+            'video' => 'Camera and microphone permissions are required to record videos',
+            default => 'Permission denied'
+        };
+
+        $this->dispatch('notify', $message);
+        
+        // Optionally guide user to settings
+        $this->showPermissionGuide();
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```js
+    import { On, Off, Events } from '#nativephp';
+    import { onMounted, onUnmounted } from 'vue';
+
+    const handlePermissionDenied = (payload) => {
+        const messages = {
+            photo: 'Camera permission is required to take photos',
+            video: 'Camera and microphone permissions are required to record videos'
+        };
+
+        const message = messages[payload.action] || 'Permission denied';
+        console.error(message);
+        
+        // Show user-friendly message
+        alert(message + '. Please enable permissions in Settings.');
+    };
+
+    onMounted(() => {
+        On(Events.Camera.PermissionDenied, handlePermissionDenied);
+    });
+
+    onUnmounted(() => {
+        Off(Events.Camera.PermissionDenied, handlePermissionDenied);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## What Happens When Permission is Denied
+
+When a user denies permission, the following occurs:
+
+1. **Camera/video interface does not open**
+2. **PermissionDenied event is fired** with details about the action
+3. **No photo/video is captured**
+4. **No error is thrown** - the operation fails silently
+
+<Warning>
+  If permission is denied, camera functions will fail silently. Always listen for the `PermissionDenied` event to provide user feedback.
+</Warning>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Request Permissions at the Right Time">
+    Don't request permissions immediately on app launch. Wait until the user performs an action that requires the permission (like tapping a "Take Photo" button).
+
+    This provides context for why the permission is needed and improves grant rates.
+  </Accordion>
+
+  <Accordion title="Explain Before Requesting">
+    Before triggering a permission request, show a brief explanation of why you need the permission and how it benefits the user.
+
+    ```php
+    public function showCameraExplanation()
+    {
+        $this->showModal([
+            'title' => 'Camera Access',
+            'message' => 'We need camera access to let you take profile photos',
+            'action' => 'takePhoto'
+        ]);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Handle Permission Denial Gracefully">
+    When permission is denied, provide a helpful message and optionally guide users to app settings:
+
+    ```php
+    #[OnNative(PermissionDenied::class)]
+    public function handlePermissionDenied(string $action)
+    {
+        $this->dispatch('show-permission-guide', [
+            'action' => $action,
+            'message' => 'To use this feature, please enable camera access in Settings'
+        ]);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Test Both Grant and Deny Scenarios">
+    Always test your app with permissions both granted and denied to ensure a good user experience in both cases.
+
+    Consider providing alternative functionality when permissions are denied (e.g., uploading from gallery instead of taking a photo).
+  </Accordion>
+</AccordionGroup>
+
+## Permission Flow Example
+
+Here's a complete example showing proper permission handling:
+
+```php
+<?php
+
+namespace App\Livewire;
+
+use Livewire\Component;
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Native\Mobile\Events\Camera\PermissionDenied;
+
+class CameraExample extends Component
+{
+    public $photoPath = null;
+    public $permissionDenied = false;
+
+    public function takePhoto()
+    {
+        // Permission request happens automatically when calling getPhoto()
+        Camera::getPhoto()->id('profile-photo');
+    }
+
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path, ?string $id = null)
+    {
+        if ($id === 'profile-photo') {
+            $this->photoPath = $path;
+            $this->permissionDenied = false;
+            $this->dispatch('notify', 'Photo captured successfully!');
+        }
+    }
+
+    #[OnNative(PermissionDenied::class)]
+    public function handlePermissionDenied(string $action)
+    {
+        $this->permissionDenied = true;
+        
+        $this->dispatch('show-alert', [
+            'title' => 'Permission Required',
+            'message' => 'Camera permission is required to take photos. Please enable it in your device settings.',
+            'action' => 'openSettings'
+        ]);
+    }
+
+    public function render()
+    {
+        return view('livewire.camera-example');
+    }
+}
+```
+
+## Summary
+
+<CardGroup cols={2}>
+  <Card title="Android" icon="android">
+    - CAMERA permission for photo/video
+    - RECORD_AUDIO for video with audio
+    - Foreground service permissions
+    - Runtime permission requests
+  </Card>
+  <Card title="iOS" icon="apple">
+    - NSCameraUsageDescription required
+    - NSMicrophoneUsageDescription for video
+    - NSPhotoLibraryUsageDescription for gallery
+    - Customize permission messages
+  </Card>
+</CardGroup>
+
+<Check>
+  **Remember:** Always handle the `PermissionDenied` event to provide feedback when users deny permissions.
+</Check>

@@ -1,0 +1,445 @@
+---
+title: 'PHP API'
+description: 'PHP-specific API reference for Laravel and Livewire applications'
+---
+
+## Camera Facade
+
+The Camera plugin provides a Laravel facade for all camera operations.
+
+### Import
+
+```php
+use Native\Mobile\Facades\Camera;
+```
+
+## Methods
+
+### getPhoto()
+
+Capture a photo with the device camera.
+
+```php
+Camera::getPhoto();
+```
+
+Returns a fluent `PendingPhotoCapture` instance that supports chaining:
+
+```php
+Camera::getPhoto()
+    ->id('user-avatar')
+    ->event(CustomPhotoEvent::class);
+```
+
+**Available Methods**:
+- `id(string $id)`: Set an identifier for tracking
+- `event(string $eventClass)`: Set a custom event class
+
+---
+
+### recordVideo()
+
+Record a video with the device camera.
+
+```php
+Camera::recordVideo();
+```
+
+Returns a `PendingVideoRecorder` instance with fluent API methods.
+
+**Array Syntax** (legacy):
+
+```php
+Camera::recordVideo(['maxDuration' => 30]);
+```
+
+**Fluent Syntax** (recommended):
+
+```php
+Camera::recordVideo()
+    ->maxDuration(60)
+    ->id('tutorial-video')
+    ->start();
+```
+
+---
+
+### pickImages()
+
+Pick images or media from the device gallery.
+
+```php
+Camera::pickImages(string $mediaType = 'all', bool $multiple = false);
+```
+
+**Parameters**:
+- `$mediaType`: `'images'`, `'videos'`, or `'all'`
+- `$multiple`: Allow multiple file selection
+
+**Examples**:
+
+```php
+// Single image
+Camera::pickImages('images', false);
+
+// Multiple images
+Camera::pickImages('images', true);
+
+// Any media type
+Camera::pickImages('all', true);
+```
+
+## PendingVideoRecorder
+
+The `PendingVideoRecorder` class provides a fluent interface for configuring video recording.
+
+### maxDuration()
+
+Set the maximum recording duration in seconds.
+
+```php
+public function maxDuration(int $seconds): self
+```
+
+**Example**:
+
+```php
+Camera::recordVideo()
+    ->maxDuration(60) // 1 minute max
+    ->start();
+```
+
+---
+
+### id()
+
+Set a unique identifier for this recording to correlate with events.
+
+```php
+public function id(string $id): self
+```
+
+**Example**:
+
+```php
+Camera::recordVideo()
+    ->id('onboarding-video-' . auth()->id())
+    ->start();
+```
+
+The ID will be included in the `VideoRecorded` or `VideoCancelled` event payload.
+
+---
+
+### event()
+
+Set a custom event class to dispatch when recording completes.
+
+```php
+public function event(string $eventClass): self
+```
+
+**Example**:
+
+```php
+use App\Events\UserVideoRecorded;
+
+Camera::recordVideo()
+    ->event(UserVideoRecorded::class)
+    ->start();
+```
+
+---
+
+### remember()
+
+Store the recorder's ID in the session for later retrieval.
+
+```php
+public function remember(): self
+```
+
+**Example**:
+
+```php
+Camera::recordVideo()
+    ->id('session-video')
+    ->remember()
+    ->start();
+
+// Later, retrieve the ID
+$videoId = session('camera.video.id');
+```
+
+---
+
+### start()
+
+Explicitly start the video recording. This method triggers the native camera.
+
+```php
+public function start(): void
+```
+
+**Example**:
+
+```php
+Camera::recordVideo()
+    ->maxDuration(120)
+    ->id('my-video')
+    ->start(); // Triggers the camera
+```
+
+**Note**: Calling `start()` is optional when using the fluent API. The camera will start automatically if you don't chain any methods after the last configuration method.
+
+## Event Handling
+
+Use the `#[OnNative]` attribute to handle camera events in your Livewire components or classes.
+
+### OnNative Attribute
+
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PhotoTaken;
+```
+
+**Syntax**:
+
+```php
+#[OnNative(EventClass::class)]
+public function methodName($arg1, $arg2, ...)
+{
+    // Handle event
+}
+```
+
+### PhotoTaken Event
+
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+class ProfileComponent extends Component
+{
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path, string $mimeType, ?string $id = null)
+    {
+        // Process the captured photo
+        $this->processPhoto($path);
+        
+        if ($id === 'profile-photo') {
+            $this->updateAvatar($path);
+        }
+    }
+}
+```
+
+**Event Payload Arguments**:
+- `string $path`: File path to the photo
+- `string $mimeType`: MIME type (e.g., `'image/jpeg'`)
+- `?string $id`: Optional identifier if set via `id()` method
+
+---
+
+### VideoRecorded Event
+
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\VideoRecorded;
+
+class VideoUploadComponent extends Component
+{
+    #[OnNative(VideoRecorded::class)]
+    public function handleVideoRecorded(string $path, string $mimeType, ?string $id = null)
+    {
+        // Upload video to server
+        $this->uploadVideo($path);
+        
+        // Store reference
+        Video::create([
+            'path' => $path,
+            'mime_type' => $mimeType,
+            'session_id' => $id,
+        ]);
+    }
+}
+```
+
+**Event Payload Arguments**:
+- `string $path`: File path to the video
+- `string $mimeType`: MIME type (e.g., `'video/mp4'`)
+- `?string $id`: Optional identifier if set via `id()` method
+
+---
+
+### VideoCancelled Event
+
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\VideoCancelled;
+
+class VideoComponent extends Component
+{
+    #[OnNative(VideoCancelled::class)]
+    public function handleVideoCancelled(?string $id = null)
+    {
+        // Handle cancellation
+        Log::info('Video recording cancelled', ['id' => $id]);
+        
+        $this->notify('Video recording was cancelled');
+    }
+}
+```
+
+**Event Payload Arguments**:
+- `?string $id`: Optional identifier if set via `id()` method
+
+---
+
+### MediaSelected Event
+
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Gallery\MediaSelected;
+
+class GalleryComponent extends Component
+{
+    #[OnNative(MediaSelected::class)]
+    public function handleMediaSelected(
+        bool $success,
+        array $files,
+        int $count,
+        ?bool $cancelled = null,
+        ?string $id = null
+    ) {
+        if (!$success) {
+            $this->notify('No files selected');
+            return;
+        }
+        
+        foreach ($files as $file) {
+            $this->processMedia(
+                $file['path'],
+                $file['mimeType'],
+                $file['type'] // 'image' or 'video'
+            );
+        }
+        
+        $this->notify("{$count} files selected");
+    }
+}
+```
+
+**Event Payload Arguments**:
+- `bool $success`: Whether files were selected
+- `array $files`: Array of file objects with `path`, `mimeType`, `extension`, `type`
+- `int $count`: Total number of files selected
+- `?bool $cancelled`: Present only when cancelled
+- `?string $id`: Optional identifier if set
+
+---
+
+### PermissionDenied Event
+
+```php
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PermissionDenied;
+
+class CameraComponent extends Component
+{
+    #[OnNative(PermissionDenied::class)]
+    public function handlePermissionDenied(string $action, ?string $id = null)
+    {
+        // Show permission denied message
+        $this->notify(
+            "Camera permission is required to {$action}. " .
+            "Please enable it in Settings."
+        );
+    }
+}
+```
+
+**Event Payload Arguments**:
+- `string $action`: Action that was denied (`'photo'` or `'video'`)
+- `?string $id`: Optional identifier if set
+
+**Note**: This event is iOS only.
+
+## Complete Example
+
+```php
+<?php
+
+namespace App\Livewire;
+
+use Livewire\Component;
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PhotoTaken;
+use Native\Mobile\Events\Camera\VideoRecorded;
+use Native\Mobile\Events\Gallery\MediaSelected;
+
+class MediaUploader extends Component
+{
+    public $photos = [];
+    public $videos = [];
+    
+    public function capturePhoto()
+    {
+        Camera::getPhoto()
+            ->id('upload-photo-' . time());
+    }
+    
+    public function recordVideo()
+    {
+        Camera::recordVideo()
+            ->maxDuration(60)
+            ->id('upload-video-' . time())
+            ->start();
+    }
+    
+    public function selectFromGallery()
+    {
+        Camera::pickImages('all', true);
+    }
+    
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhoto(string $path, string $mimeType, ?string $id = null)
+    {
+        $this->photos[] = [
+            'path' => $path,
+            'type' => $mimeType,
+            'id' => $id,
+        ];
+    }
+    
+    #[OnNative(VideoRecorded::class)]
+    public function handleVideo(string $path, string $mimeType, ?string $id = null)
+    {
+        $this->videos[] = [
+            'path' => $path,
+            'type' => $mimeType,
+            'id' => $id,
+        ];
+    }
+    
+    #[OnNative(MediaSelected::class)]
+    public function handleGallery(bool $success, array $files, int $count)
+    {
+        if ($success) {
+            foreach ($files as $file) {
+                if ($file['type'] === 'image') {
+                    $this->photos[] = $file;
+                } else {
+                    $this->videos[] = $file;
+                }
+            }
+        }
+    }
+    
+    public function render()
+    {
+        return view('livewire.media-uploader');
+    }
+}
+```

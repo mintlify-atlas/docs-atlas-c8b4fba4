@@ -1,0 +1,464 @@
+---
+title: Gallery Picker
+description: Pick images and videos from the device gallery with the NativePHP Camera Plugin
+---
+
+Allow users to select images and videos from their device's photo library. The Camera API provides a flexible interface for picking single or multiple media files with filtering options.
+
+## Basic Gallery Picker
+
+Use the `Camera::pickImages()` method to open the device's gallery picker.
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Pick a single image
+    Camera::pickImages('images', false);
+
+    // Pick multiple images
+    Camera::pickImages('images', true);
+
+    // Pick any media type (images or videos)
+    Camera::pickImages('all', true);
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Pick images
+    await Camera.pickImages()
+        .images()
+        .multiple()
+        .maxItems(5);
+    ```
+  </Tab>
+</Tabs>
+
+## Media Type Filtering
+
+Control which types of media can be selected from the gallery.
+
+### Available Media Types
+
+<ParamField path="mediaType" type="string" default="all">
+  The type of media to allow selection:
+  - `"images"` or `"image"` - Only images
+  - `"videos"` or `"video"` - Only videos
+  - `"all"` or `"*"` - Both images and videos
+</ParamField>
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Images only
+    Camera::pickImages('images', true);
+
+    // Videos only
+    Camera::pickImages('videos', true);
+
+    // All media types
+    Camera::pickImages('all', true);
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Images only
+    await Camera.pickImages()
+        .images()
+        .multiple();
+
+    // Videos only
+    await Camera.pickImages()
+        .videos()
+        .multiple();
+
+    // All media types
+    await Camera.pickImages()
+        .all()
+        .multiple();
+    ```
+  </Tab>
+</Tabs>
+
+## Multiple Selection
+
+Allow users to select multiple files at once with optional limits.
+
+<ParamField path="multiple" type="boolean" default="false">
+  Allow multiple file selection.
+</ParamField>
+
+<ParamField path="maxItems" type="int" default="10">
+  Maximum number of items when `multiple` is `true`. Set to `0` for no limit.
+</ParamField>
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Single image
+    Camera::pickImages('images', false);
+
+    // Multiple images (up to 10 by default)
+    Camera::pickImages('images', true);
+
+    // Multiple images with custom limit
+    Camera::pickImages('images', true, 5);
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Single image
+    await Camera.pickImages()
+        .images();
+
+    // Multiple images (up to 10 by default)
+    await Camera.pickImages()
+        .images()
+        .multiple();
+
+    // Multiple images with custom limit
+    await Camera.pickImages()
+        .images()
+        .multiple()
+        .maxItems(5);
+    ```
+  </Tab>
+</Tabs>
+
+## Handling Media Selection
+
+The Camera Plugin fires the `MediaSelected` event when media is selected or the picker is cancelled.
+
+### MediaSelected Event
+
+Fired when media selection completes (whether files were selected or the picker was cancelled).
+
+**Event Payload:**
+- `bool $success` - `true` if files were selected, `false` if cancelled
+- `array $files` - Array of selected file information
+- `int $count` - Number of files selected
+- `bool $cancelled` - `true` if the picker was cancelled (only present when cancelled)
+- `?string $id` - Optional identifier if set via `id()` method
+
+**File Information (each item in `$files` array):**
+- `string $path` - File path to the selected media
+- `string $mimeType` - MIME type (e.g., `image/jpeg`, `video/mp4`)
+- `string $extension` - File extension (e.g., `jpg`, `mp4`)
+- `string $type` - Media type (`"image"` or `"video"`)
+
+<Tabs>
+  <Tab title="PHP (Livewire)">
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Gallery\MediaSelected;
+
+    #[OnNative(MediaSelected::class)]
+    public function handleMediaSelected($success, $files, $count)
+    {
+        if ($success) {
+            foreach ($files as $file) {
+                $this->processMedia($file);
+                
+                // Access file properties
+                $path = $file['path'];
+                $mimeType = $file['mimeType'];
+                $extension = $file['extension'];
+                $type = $file['type']; // "image" or "video"
+            }
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```js
+    import { On, Off, Events } from '#nativephp';
+    import { ref, onMounted, onUnmounted } from 'vue';
+
+    const selectedFiles = ref([]);
+
+    const handleMediaSelected = (payload) => {
+        if (payload.success) {
+            selectedFiles.value = payload.files;
+            
+            payload.files.forEach(file => {
+                console.log('File path:', file.path);
+                console.log('MIME type:', file.mimeType);
+                console.log('Type:', file.type); // "image" or "video"
+            });
+        } else {
+            console.log('Picker was cancelled');
+        }
+    };
+
+    onMounted(() => {
+        On(Events.Gallery.MediaSelected, handleMediaSelected);
+    });
+
+    onUnmounted(() => {
+        Off(Events.Gallery.MediaSelected, handleMediaSelected);
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Tracking with IDs
+
+Use identifiers to track multiple picker operations in your app.
+
+<Tabs>
+  <Tab title="PHP">
+    ```php
+    use Native\Mobile\Facades\Camera;
+
+    // Pick images with identifier
+    Camera::pickImages('images', true)->id('profile-gallery');
+    ```
+  </Tab>
+  <Tab title="JavaScript">
+    ```js
+    import { Camera } from '#nativephp';
+
+    // Pick images with identifier
+    await Camera.pickImages()
+        .images()
+        .multiple()
+        .id('profile-gallery');
+    ```
+  </Tab>
+</Tabs>
+
+Then check the `id` in your event handler:
+
+```php
+#[OnNative(MediaSelected::class)]
+public function handleMediaSelected($success, $files, $count, ?string $id = null)
+{
+    if ($id === 'profile-gallery' && $success) {
+        // Handle profile gallery selection
+    }
+}
+```
+
+## Storage Locations
+
+Selected media files are copied to temporary directories for your app to process:
+
+<AccordionGroup>
+  <Accordion title="Android Storage">
+    Files are copied to the app's cache directory with descriptive names:
+
+    - Location: App cache directory
+    - Path format: `{cache}/gallery_selected_{timestamp}_{index}.{ext}`
+  </Accordion>
+
+  <Accordion title="iOS Storage">
+    Files are copied to a temporary Gallery subdirectory:
+
+    - Location: Temporary directory
+    - Path format: `~/Library/Caches/Gallery/gallery_selected_{timestamp}_{index}.{ext}`
+
+    <Note>
+      Files are stored in temporary directories. Copy them to permanent storage if you need to keep them after processing.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+## Supported File Types
+
+The gallery picker supports common image and video formats:
+
+**Images:**
+- JPEG (`.jpg`, `.jpeg`) - `image/jpeg`
+- PNG (`.png`) - `image/png`
+- GIF (`.gif`) - `image/gif`
+- WebP (`.webp`) - `image/webp`
+
+**Videos:**
+- MP4 (`.mp4`) - `video/mp4`
+- QuickTime (`.mov`) - `video/quicktime`
+- AVI (`.avi`) - `video/avi`
+- WebM (`.webm`) - `video/webm`
+
+## Permissions
+
+<Warning>
+  Photo library permission is required on iOS to access the gallery. Android does not require runtime permissions for gallery access on API 33+.
+</Warning>
+
+See the [Permissions guide](/guides/permissions) for details on configuring photo library permissions.
+
+## Complete Example
+
+Here's a complete example showing gallery picker with event handling:
+
+<Tabs>
+  <Tab title="PHP (Livewire)">
+    ```php
+    <?php
+
+    namespace App\Livewire;
+
+    use Livewire\Component;
+    use Native\Mobile\Facades\Camera;
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Gallery\MediaSelected;
+
+    class GalleryPicker extends Component
+    {
+        public $selectedFiles = [];
+        public $fileCount = 0;
+
+        public function pickImages()
+        {
+            Camera::pickImages('images', true)
+                ->id('gallery-picker');
+        }
+
+        public function pickVideos()
+        {
+            Camera::pickImages('videos', true)
+                ->id('video-picker');
+        }
+
+        public function pickAny()
+        {
+            Camera::pickImages('all', true, 10)
+                ->id('all-media');
+        }
+
+        #[OnNative(MediaSelected::class)]
+        public function handleMediaSelected($success, $files, $count, ?string $id = null)
+        {
+            if (!$success) {
+                $this->dispatch('notify', 'Selection cancelled');
+                return;
+            }
+
+            $this->selectedFiles = $files;
+            $this->fileCount = $count;
+
+            // Process each file
+            foreach ($files as $file) {
+                $this->processFile($file);
+            }
+
+            $this->dispatch('notify', "{$count} file(s) selected");
+        }
+
+        private function processFile(array $file)
+        {
+            // Upload or process the file
+            $path = $file['path'];
+            $type = $file['type']; // "image" or "video"
+            $mimeType = $file['mimeType'];
+
+            // Your processing logic here
+        }
+
+        public function render()
+        {
+            return view('livewire.gallery-picker');
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Vue">
+    ```vue
+    <script setup>
+    import { ref, onMounted, onUnmounted } from 'vue';
+    import { Camera, On, Off, Events } from '#nativephp';
+
+    const selectedFiles = ref([]);
+    const fileCount = ref(0);
+
+    const pickImages = async () => {
+        await Camera.pickImages()
+            .images()
+            .multiple()
+            .maxItems(5)
+            .id('gallery-picker');
+    };
+
+    const pickVideos = async () => {
+        await Camera.pickImages()
+            .videos()
+            .multiple()
+            .id('video-picker');
+    };
+
+    const pickAny = async () => {
+        await Camera.pickImages()
+            .all()
+            .multiple()
+            .maxItems(10)
+            .id('all-media');
+    };
+
+    const handleMediaSelected = (payload) => {
+        if (!payload.success) {
+            console.log('Selection cancelled');
+            return;
+        }
+
+        selectedFiles.value = payload.files;
+        fileCount.value = payload.count;
+
+        // Process each file
+        payload.files.forEach(file => {
+            processFile(file);
+        });
+
+        console.log(`${payload.count} file(s) selected`);
+    };
+
+    const processFile = (file) => {
+        // Upload or process the file
+        const { path, type, mimeType } = file;
+        console.log('Processing:', type, path);
+        
+        // Your processing logic here
+    };
+
+    onMounted(() => {
+        On(Events.Gallery.MediaSelected, handleMediaSelected);
+    });
+
+    onUnmounted(() => {
+        Off(Events.Gallery.MediaSelected, handleMediaSelected);
+    });
+    </script>
+
+    <template>
+      <div>
+        <div class="buttons">
+          <button @click="pickImages">Pick Images</button>
+          <button @click="pickVideos">Pick Videos</button>
+          <button @click="pickAny">Pick Any Media</button>
+        </div>
+
+        <div v-if="fileCount > 0">
+          <p>{{ fileCount }} file(s) selected</p>
+          <div class="files">
+            <div v-for="(file, index) in selectedFiles" :key="index">
+              <img v-if="file.type === 'image'" :src="file.path" />
+              <video v-else-if="file.type === 'video'" :src="file.path" controls />
+              <p>{{ file.mimeType }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+    ```
+  </Tab>
+</Tabs>

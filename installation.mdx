@@ -1,0 +1,169 @@
+---
+title: Installation
+description: Install and configure the NativePHP Camera Plugin in your mobile application
+---
+
+# Installation
+
+Get the Camera Plugin installed and configured in your NativePHP Mobile application.
+
+## Requirements
+
+Before installing, ensure your project meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="PHP 8.2+" icon="php">
+    The plugin requires PHP version 8.2 or higher
+  </Card>
+  
+  <Card title="NativePHP Mobile" icon="mobile">
+    You must have NativePHP Mobile installed in your project
+  </Card>
+</CardGroup>
+
+<Warning>
+The Camera Plugin is specifically designed for NativePHP Mobile applications. It will not work with NativePHP desktop applications.
+</Warning>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Install via Composer">
+    Add the Camera Plugin to your project using Composer:
+    
+    ```bash
+    composer require nativephp/mobile-camera
+    ```
+    
+    This will download the plugin and add it to your `composer.json` dependencies.
+  </Step>
+  
+  <Step title="Register the Plugin">
+    Register the plugin with NativePHP using the Artisan command:
+    
+    ```bash
+    php artisan native:plugin:register nativephp/mobile-camera
+    ```
+    
+    This command registers the plugin's service provider and ensures all necessary files are published.
+  </Step>
+  
+  <Step title="Configure Permissions">
+    Enable camera permissions in your `config/nativephp.php` configuration file:
+    
+    ```php
+    return [
+        'permissions' => [
+            'camera' => true,
+            // ... other permissions
+        ],
+    ];
+    ```
+    
+    <Warning>
+    Camera permission is **required** for all camera features including photo capture, video recording, and QR/barcode scanning. If permission is denied, camera functions will fail silently.
+    </Warning>
+  </Step>
+  
+  <Step title="Rebuild Your App">
+    After configuring permissions, rebuild your mobile application:
+    
+    ```bash
+    # For Android
+    php artisan native:android:build
+    
+    # For iOS
+    php artisan native:ios:build
+    ```
+    
+    This ensures the permission configurations are properly included in your native builds.
+  </Step>
+</Steps>
+
+## Platform-Specific Configuration
+
+The plugin handles platform-specific configurations automatically, but it's helpful to understand what's configured:
+
+### Android Configuration
+
+The following permissions are automatically added to your Android manifest:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
+```
+
+**Minimum Android Version**: API Level 33 (Android 13)
+
+### iOS Configuration
+
+The following usage descriptions are automatically added to your `Info.plist`:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>This app requires camera access to take photos and videos.</string>
+
+<key>NSMicrophoneUsageDescription</key>
+<string>This app requires microphone access to record video with audio.</string>
+
+<key>NSPhotoLibraryUsageDescription</key>
+<string>This app requires photo library access to select media.</string>
+```
+
+**Minimum iOS Version**: 18.2
+
+<Note>
+You can customize these usage descriptions in your app's configuration to better match your use case.
+</Note>
+
+## Verify Installation
+
+To verify the plugin is installed correctly, check that the facade is available:
+
+```php
+use Native\Mobile\Facades\Camera;
+
+// This should not throw an error
+dd(class_exists(Camera::class)); // true
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Learn how to capture photos and videos
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Explore all available methods and events
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Plugin Not Found
+
+If you get a "Class not found" error:
+
+1. Clear your Laravel cache: `php artisan cache:clear`
+2. Clear config cache: `php artisan config:clear`
+3. Rebuild your application
+
+### Permission Denied Errors
+
+If camera features aren't working:
+
+1. Verify `camera` permission is enabled in `config/nativephp.php`
+2. Rebuild your mobile application after changing permissions
+3. Check device settings to ensure camera permission is granted
+4. Listen for the `PermissionDenied` event to handle gracefully
+
+### Service Provider Not Registered
+
+If the facade doesn't work:
+
+1. Run `php artisan native:plugin:register nativephp/mobile-camera` again
+2. Check that `composer.json` includes the plugin in the `require` section
+3. Run `composer dump-autoload`

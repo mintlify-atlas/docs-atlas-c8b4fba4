@@ -1,0 +1,556 @@
+---
+title: 'JavaScript API'
+description: 'JavaScript API reference for Vue, React, and Inertia applications'
+---
+
+## Import
+
+Import Camera methods and event utilities from the `#nativephp` package:
+
+```javascript
+import { Camera, On, Off, Events } from '#nativephp';
+```
+
+## Camera Methods
+
+### Camera.getPhoto()
+
+Capture a photo with the device camera.
+
+```javascript
+await Camera.getPhoto();
+```
+
+Returns a fluent API object that supports chaining:
+
+```javascript
+await Camera.getPhoto()
+    .id('profile-pic');
+```
+
+**Chainable Methods**:
+- `.id(string)`: Set an identifier for tracking this operation
+
+---
+
+### Camera.recordVideo()
+
+Record a video with the device camera.
+
+```javascript
+await Camera.recordVideo();
+```
+
+Returns a fluent API object with configuration methods:
+
+```javascript
+await Camera.recordVideo()
+    .maxDuration(60)
+    .id('tutorial-video');
+```
+
+**Chainable Methods**:
+- `.maxDuration(number)`: Set maximum recording duration in seconds
+- `.id(string)`: Set an identifier for tracking this operation
+
+---
+
+### Camera.pickImages()
+
+Pick images or media from the device gallery.
+
+```javascript
+await Camera.pickImages();
+```
+
+Returns a fluent API object with selection configuration:
+
+```javascript
+// Single image
+await Camera.pickImages()
+    .images()
+    .single();
+
+// Multiple images (up to 5)
+await Camera.pickImages()
+    .images()
+    .multiple()
+    .maxItems(5);
+
+// Multiple videos
+await Camera.pickImages()
+    .videos()
+    .multiple();
+
+// Any media type
+await Camera.pickImages()
+    .all()
+    .multiple()
+    .maxItems(10);
+```
+
+**Chainable Methods**:
+- `.images()`: Only allow image selection
+- `.videos()`: Only allow video selection
+- `.all()`: Allow both images and videos
+- `.single()`: Allow only one file (default)
+- `.multiple()`: Allow multiple file selection
+- `.maxItems(number)`: Set maximum number of items when multiple is enabled
+- `.id(string)`: Set an identifier for tracking this operation
+
+## Event Handling
+
+Use the `On` and `Off` functions to register and unregister event listeners. Event names are available in the `Events` object.
+
+### Event Constants
+
+The `Events` object provides namespaced event constants:
+
+```javascript
+import { Events } from '#nativephp';
+
+// Camera events
+Events.Camera.PhotoTaken
+Events.Camera.PhotoCancelled
+Events.Camera.VideoRecorded
+Events.Camera.VideoCancelled
+Events.Camera.PermissionDenied
+
+// Gallery events
+Events.Gallery.MediaSelected
+```
+
+### On(event, handler)
+
+Register an event listener.
+
+```javascript
+On(eventName, handlerFunction)
+```
+
+**Parameters**:
+- `eventName` (string): Event name from `Events` constants
+- `handlerFunction` (function): Callback to handle the event
+
+**Example**:
+
+```javascript
+import { On, Events } from '#nativephp';
+
+const handlePhoto = (payload) => {
+    console.log('Photo taken:', payload.path);
+    console.log('MIME type:', payload.mimeType);
+    if (payload.id) {
+        console.log('ID:', payload.id);
+    }
+};
+
+On(Events.Camera.PhotoTaken, handlePhoto);
+```
+
+---
+
+### Off(event, handler)
+
+Unregister an event listener.
+
+```javascript
+Off(eventName, handlerFunction)
+```
+
+**Parameters**:
+- `eventName` (string): Event name from `Events` constants
+- `handlerFunction` (function): The same callback function used with `On()`
+
+**Example**:
+
+```javascript
+import { Off, Events } from '#nativephp';
+
+Off(Events.Camera.PhotoTaken, handlePhoto);
+```
+
+**Important**: Always unregister listeners when components unmount to prevent memory leaks.
+
+## Vue 3 Examples
+
+### Photo Capture
+
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { Camera, On, Off, Events } from '#nativephp';
+
+const photoPath = ref('');
+const isLoading = ref(false);
+
+const capturePhoto = async () => {
+    isLoading.value = true;
+    await Camera.getPhoto().id('profile-pic');
+};
+
+const handlePhotoTaken = (payload) => {
+    photoPath.value = payload.path;
+    isLoading.value = false;
+    console.log('Photo saved:', payload.path);
+};
+
+const handlePhotoCancelled = () => {
+    isLoading.value = false;
+    console.log('Photo capture cancelled');
+};
+
+onMounted(() => {
+    On(Events.Camera.PhotoTaken, handlePhotoTaken);
+    On(Events.Camera.PhotoCancelled, handlePhotoCancelled);
+});
+
+onUnmounted(() => {
+    Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+    Off(Events.Camera.PhotoCancelled, handlePhotoCancelled);
+});
+</script>
+
+<template>
+    <div>
+        <button @click="capturePhoto" :disabled="isLoading">
+            {{ isLoading ? 'Opening camera...' : 'Take Photo' }}
+        </button>
+        <img v-if="photoPath" :src="photoPath" alt="Captured photo" />
+    </div>
+</template>
+```
+
+### Video Recording
+
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { Camera, On, Off, Events } from '#nativephp';
+
+const videoPath = ref('');
+const isRecording = ref(false);
+
+const recordVideo = async () => {
+    isRecording.value = true;
+    await Camera.recordVideo()
+        .maxDuration(60)
+        .id('user-video');
+};
+
+const handleVideoRecorded = (payload) => {
+    videoPath.value = payload.path;
+    isRecording.value = false;
+    console.log('Video saved:', payload.path);
+};
+
+const handleVideoCancelled = () => {
+    isRecording.value = false;
+    console.log('Recording cancelled');
+};
+
+onMounted(() => {
+    On(Events.Camera.VideoRecorded, handleVideoRecorded);
+    On(Events.Camera.VideoCancelled, handleVideoCancelled);
+});
+
+onUnmounted(() => {
+    Off(Events.Camera.VideoRecorded, handleVideoRecorded);
+    Off(Events.Camera.VideoCancelled, handleVideoCancelled);
+});
+</script>
+
+<template>
+    <div>
+        <button @click="recordVideo" :disabled="isRecording">
+            {{ isRecording ? 'Recording...' : 'Record Video' }}
+        </button>
+        <video v-if="videoPath" :src="videoPath" controls />
+    </div>
+</template>
+```
+
+### Gallery Selection
+
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { Camera, On, Off, Events } from '#nativephp';
+
+const selectedFiles = ref([]);
+
+const selectImages = async () => {
+    await Camera.pickImages()
+        .images()
+        .multiple()
+        .maxItems(5)
+        .id('gallery-select');
+};
+
+const handleMediaSelected = (payload) => {
+    if (payload.success) {
+        selectedFiles.value = payload.files;
+        console.log(`${payload.count} files selected`);
+    } else {
+        console.log('Selection cancelled');
+    }
+};
+
+onMounted(() => {
+    On(Events.Gallery.MediaSelected, handleMediaSelected);
+});
+
+onUnmounted(() => {
+    Off(Events.Gallery.MediaSelected, handleMediaSelected);
+});
+</script>
+
+<template>
+    <div>
+        <button @click="selectImages">Select Images</button>
+        <div v-for="file in selectedFiles" :key="file.path">
+            <img v-if="file.type === 'image'" :src="file.path" />
+            <video v-else :src="file.path" controls />
+        </div>
+    </div>
+</template>
+```
+
+## React Examples
+
+### Photo Capture
+
+```jsx
+import { useState, useEffect } from 'react';
+import { Camera, On, Off, Events } from '#nativephp';
+
+function PhotoCapture() {
+    const [photoPath, setPhotoPath] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    
+    const capturePhoto = async () => {
+        setIsLoading(true);
+        await Camera.getPhoto().id('profile-pic');
+    };
+    
+    useEffect(() => {
+        const handlePhotoTaken = (payload) => {
+            setPhotoPath(payload.path);
+            setIsLoading(false);
+        };
+        
+        const handlePhotoCancelled = () => {
+            setIsLoading(false);
+        };
+        
+        On(Events.Camera.PhotoTaken, handlePhotoTaken);
+        On(Events.Camera.PhotoCancelled, handlePhotoCancelled);
+        
+        return () => {
+            Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+            Off(Events.Camera.PhotoCancelled, handlePhotoCancelled);
+        };
+    }, []);
+    
+    return (
+        <div>
+            <button onClick={capturePhoto} disabled={isLoading}>
+                {isLoading ? 'Opening camera...' : 'Take Photo'}
+            </button>
+            {photoPath && <img src={photoPath} alt="Captured photo" />}
+        </div>
+    );
+}
+
+export default PhotoCapture;
+```
+
+### Video Recording
+
+```jsx
+import { useState, useEffect } from 'react';
+import { Camera, On, Off, Events } from '#nativephp';
+
+function VideoRecorder() {
+    const [videoPath, setVideoPath] = useState('');
+    const [isRecording, setIsRecording] = useState(false);
+    
+    const recordVideo = async () => {
+        setIsRecording(true);
+        await Camera.recordVideo()
+            .maxDuration(60)
+            .id('user-video');
+    };
+    
+    useEffect(() => {
+        const handleVideoRecorded = (payload) => {
+            setVideoPath(payload.path);
+            setIsRecording(false);
+        };
+        
+        const handleVideoCancelled = () => {
+            setIsRecording(false);
+        };
+        
+        On(Events.Camera.VideoRecorded, handleVideoRecorded);
+        On(Events.Camera.VideoCancelled, handleVideoCancelled);
+        
+        return () => {
+            Off(Events.Camera.VideoRecorded, handleVideoRecorded);
+            Off(Events.Camera.VideoCancelled, handleVideoCancelled);
+        };
+    }, []);
+    
+    return (
+        <div>
+            <button onClick={recordVideo} disabled={isRecording}>
+                {isRecording ? 'Recording...' : 'Record Video'}
+            </button>
+            {videoPath && <video src={videoPath} controls />}
+        </div>
+    );
+}
+
+export default VideoRecorder;
+```
+
+### Gallery Selection
+
+```jsx
+import { useState, useEffect } from 'react';
+import { Camera, On, Off, Events } from '#nativephp';
+
+function GalleryPicker() {
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    
+    const selectImages = async () => {
+        await Camera.pickImages()
+            .images()
+            .multiple()
+            .maxItems(5);
+    };
+    
+    useEffect(() => {
+        const handleMediaSelected = (payload) => {
+            if (payload.success) {
+                setSelectedFiles(payload.files);
+                console.log(`${payload.count} files selected`);
+            }
+        };
+        
+        On(Events.Gallery.MediaSelected, handleMediaSelected);
+        
+        return () => {
+            Off(Events.Gallery.MediaSelected, handleMediaSelected);
+        };
+    }, []);
+    
+    return (
+        <div>
+            <button onClick={selectImages}>Select Images</button>
+            {selectedFiles.map((file) => (
+                <div key={file.path}>
+                    {file.type === 'image' ? (
+                        <img src={file.path} alt="Selected" />
+                    ) : (
+                        <video src={file.path} controls />
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+export default GalleryPicker;
+```
+
+## Permission Handling
+
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { Camera, On, Off, Events } from '#nativephp';
+
+const permissionDenied = ref(false);
+
+const capturePhoto = async () => {
+    permissionDenied.value = false;
+    await Camera.getPhoto();
+};
+
+const handlePermissionDenied = (payload) => {
+    permissionDenied.value = true;
+    alert(`Camera permission denied for ${payload.action}`);
+};
+
+onMounted(() => {
+    On(Events.Camera.PermissionDenied, handlePermissionDenied);
+});
+
+onUnmounted(() => {
+    Off(Events.Camera.PermissionDenied, handlePermissionDenied);
+});
+</script>
+
+<template>
+    <div>
+        <button @click="capturePhoto">Take Photo</button>
+        <p v-if="permissionDenied" class="error">
+            Camera permission is required. Please enable it in Settings.
+        </p>
+    </div>
+</template>
+```
+
+## Best Practices
+
+### Always Clean Up Event Listeners
+
+Always unregister event listeners when components unmount to prevent memory leaks:
+
+```javascript
+// Vue
+onUnmounted(() => {
+    Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+});
+
+// React
+useEffect(() => {
+    On(Events.Camera.PhotoTaken, handlePhotoTaken);
+    
+    return () => {
+        Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+    };
+}, []);
+```
+
+### Use Identifiers for Multiple Operations
+
+When triggering multiple camera operations, use the `id()` method to distinguish between them:
+
+```javascript
+await Camera.getPhoto().id('avatar');
+await Camera.getPhoto().id('cover-photo');
+
+// In event handler
+const handlePhotoTaken = (payload) => {
+    if (payload.id === 'avatar') {
+        updateAvatar(payload.path);
+    } else if (payload.id === 'cover-photo') {
+        updateCover(payload.path);
+    }
+};
+```
+
+### Handle Cancellations
+
+Always handle cancellation events to provide good UX:
+
+```javascript
+const handlePhotoCancelled = () => {
+    setLoading(false);
+    console.log('User cancelled photo capture');
+};
+
+On(Events.Camera.PhotoCancelled, handlePhotoCancelled);
+```

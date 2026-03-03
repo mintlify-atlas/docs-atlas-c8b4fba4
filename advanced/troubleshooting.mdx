@@ -1,0 +1,386 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for the Camera plugin
+---
+
+This guide covers common issues you may encounter when using the NativePHP Camera plugin and how to resolve them.
+
+## Permission Issues
+
+<AccordionGroup>
+  <Accordion title="Camera permission denied on first use">
+    **Problem:** Camera functions fail silently or fire `PermissionDenied` event.
+    
+    **Solution:**
+    
+    1. Ensure you've enabled the camera permission in `config/nativephp.php`:
+    
+    ```php
+    'permissions' => [
+        'camera',
+        // other permissions...
+    ],
+    ```
+    
+    2. Rebuild your app after changing permissions:
+    
+    ```bash
+    php artisan native:build
+    ```
+    
+    3. On iOS, verify your Info.plist contains the required usage descriptions.
+  </Accordion>
+  
+  <Accordion title="Permission works on Android but not iOS">
+    **Problem:** Camera works on Android but fails on iOS.
+    
+    **iOS requires explicit usage descriptions in Info.plist:**
+    
+    ```xml
+    <key>NSCameraUsageDescription</key>
+    <string>This app requires camera access to take photos and videos.</string>
+    
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app requires microphone access to record video with audio.</string>
+    ```
+    
+    **Solution:** Add these to your iOS configuration and rebuild.
+  </Accordion>
+  
+  <Accordion title="User previously denied permission">
+    **Problem:** User denied permission initially and now can't use camera features.
+    
+    **Solution:** Guide users to app settings to manually enable permissions.
+    
+    ```php
+    use Native\Mobile\Attributes\OnNative;
+    use Native\Mobile\Events\Camera\PermissionDenied;
+    
+    #[OnNative(PermissionDenied::class)]
+    public function handlePermissionDenied(string $action, ?string $id)
+    {
+        // Show user-friendly message with instructions
+        session()->flash('error', 
+            'Camera permission is required. Please enable it in your device settings.'
+        );
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Camera Not Available
+
+<AccordionGroup>
+  <Accordion title="Camera not available error">
+    **Problem:** iOS logs show "Camera not available" or "Camera or video recording not available".
+    
+    **Possible causes:**
+    
+    - Running on iOS Simulator (no camera hardware)
+    - Device camera is in use by another app
+    - Camera hardware failure
+    
+    **Solution:**
+    
+    - Test on a physical device, not the simulator
+    - Ensure no other apps are using the camera
+    - Check device camera works in native Camera app
+  </Accordion>
+  
+  <Accordion title="Video recording not available">
+    **Problem:** Photos work but video recording fails.
+    
+    **On iOS:** Some older devices or simulators may not support video recording.
+    
+    **Solution:** The plugin checks `UIImagePickerController.availableMediaTypes(for: .camera)` for video support. This will fire a `VideoCancelled` event if video is unavailable.
+  </Accordion>
+</AccordionGroup>
+
+## File and Storage Issues
+
+<AccordionGroup>
+  <Accordion title="File not found after capture">
+    **Problem:** Event fires but file path doesn't exist.
+    
+    **Possible causes:**
+    
+    - File save operation failed
+    - Insufficient storage space
+    - Permission issues writing to temp directory
+    
+    **Solution:**
+    
+    ```php
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path)
+    {
+        if (!file_exists($path)) {
+            Log::error('Photo file not found', [
+                'path' => $path,
+                'disk_free' => disk_free_space(dirname($path))
+            ]);
+            return;
+        }
+        
+        // Process the file...
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Captured files disappear">
+    **Problem:** Files exist initially but disappear later.
+    
+    **Cause:** Temporary directories can be cleared by the OS.
+    
+    **Solution:** Move important files to permanent storage immediately:
+    
+    ```php
+    use Illuminate\Support\Facades\Storage;
+    
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path)
+    {
+        // Move to permanent storage
+        $filename = 'photos/' . uniqid() . '.jpg';
+        Storage::put($filename, file_get_contents($path));
+        
+        // Clean up temp file
+        @unlink($path);
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Large video files failing to save">
+    **Problem:** Short videos work but longer videos fail.
+    
+    **Possible causes:**
+    
+    - Insufficient storage space
+    - PHP memory limit (when reading file)
+    - Server upload limits (when uploading to server)
+    
+    **Solution:**
+    
+    ```php
+    // Check available space before processing
+    #[OnNative(VideoRecorded::class)]
+    public function handleVideoRecorded(string $path, string $mimeType, ?string $id)
+    {
+        $fileSize = filesize($path);
+        $freeSpace = disk_free_space(Storage::path('/'));
+        
+        if ($freeSpace < $fileSize * 2) {
+            Log::warning('Insufficient storage space');
+            return;
+        }
+        
+        // Use streaming for large files
+        Storage::putFileAs('videos', $path, uniqid() . '.mp4');
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Event Handling Issues
+
+<AccordionGroup>
+  <Accordion title="Events not firing">
+    **Problem:** Camera works but events don't fire in your code.
+    
+    **Common mistakes:**
+    
+    1. **Forgot to use the OnNative attribute (PHP):**
+    
+    ```php
+    // ❌ Wrong - missing attribute
+    public function handlePhotoTaken(string $path) { }
+    
+    // ✅ Correct
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path) { }
+    ```
+    
+    2. **Forgot to register event listener (JavaScript):**
+    
+    ```javascript
+    // ❌ Wrong - listener not registered
+    const handlePhotoTaken = (payload) => { ... };
+    
+    // ✅ Correct
+    On(Events.Camera.PhotoTaken, handlePhotoTaken);
+    ```
+    
+    3. **Event listener registered in unmounted component (Vue/React)**
+    
+    Make sure listeners are registered when component is mounted and removed on unmount.
+  </Accordion>
+  
+  <Accordion title="Wrong event class name">
+    **Problem:** Used incorrect event class name.
+    
+    **Correct event class names:**
+    
+    ```php
+    Native\Mobile\Events\Camera\PhotoTaken
+    Native\Mobile\Events\Camera\PhotoCancelled
+    Native\Mobile\Events\Camera\VideoRecorded
+    Native\Mobile\Events\Camera\VideoCancelled
+    Native\Mobile\Events\Gallery\MediaSelected
+    Native\Mobile\Events\Camera\PermissionDenied
+    ```
+  </Accordion>
+  
+  <Accordion title="Events firing but with wrong data">
+    **Problem:** Event fires but payload is missing expected fields.
+    
+    **Check payload structure:**
+    
+    - `PhotoTaken`: `{path: string, mimeType: string, id?: string}`
+    - `VideoRecorded`: `{path: string, mimeType: string, id?: string}`
+    - `MediaSelected`: `{success: boolean, files: array, count: number, id?: string}`
+    - `PermissionDenied`: `{action: string, id?: string}`
+    
+    Note: `id` is only present if you set it via `.id()` method.
+  </Accordion>
+</AccordionGroup>
+
+## Platform-Specific Issues
+
+### Android
+
+<AccordionGroup>
+  <Accordion title="Foreground service errors">
+    **Problem:** Video recording fails with foreground service errors.
+    
+    **Cause:** Missing or incorrect foreground service permissions.
+    
+    **Solution:** Ensure your Android manifest includes:
+    
+    ```xml
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
+    ```
+    
+    These are automatically included by the plugin, but may conflict with other plugins.
+  </Accordion>
+  
+  <Accordion title="Camera intent fails">
+    **Problem:** Android logs show camera intent failing.
+    
+    **Debug steps:**
+    
+    ```bash
+    # Check if camera app is available
+    adb shell pm list packages | grep camera
+    
+    # View detailed error logs
+    adb logcat | grep -E "CameraFunctions|CameraCoordinator"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### iOS
+
+<AccordionGroup>
+  <Accordion title="Failed to get root view controller">
+    **Problem:** iOS logs show "Failed to get root view controller".
+    
+    **Cause:** Camera is being invoked before the app window is fully initialized.
+    
+    **Solution:** Ensure camera functions are called after app is fully loaded (e.g., not in app initialization code).
+  </Accordion>
+  
+  <Accordion title="Image conversion to JPEG fails">
+    **Problem:** iOS logs show "Failed to convert image to JPEG".
+    
+    **Cause:** Image data from camera is corrupted or in unexpected format.
+    
+    **This is rare but can happen if:**
+    - Device is extremely low on memory
+    - Camera hardware issue
+    
+    **Solution:** The plugin will fire `PhotoCancelled` event. Handle it gracefully and let user retry.
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Tips
+
+### Enable Detailed Logging
+
+**Android:**
+```bash
+# Watch all camera-related logs with emoji markers
+adb logcat | grep -E "📸|🎥|🖼️|❌|Camera"
+```
+
+**iOS:**
+In Xcode Console, filter for:
+- 📸 - Photo operations
+- 🎥 - Video operations  
+- 🖼️ - Gallery operations
+- ❌ - Errors
+- ✅ - Success messages
+
+### Test Event Flow
+
+```php
+use Illuminate\Support\Facades\Log;
+
+#[OnNative(PhotoTaken::class)]
+public function handlePhotoTaken(string $path, string $mimeType = 'image/jpeg', ?string $id = null)
+{
+    Log::info('PhotoTaken event received', [
+        'path' => $path,
+        'exists' => file_exists($path),
+        'size' => file_exists($path) ? filesize($path) : 0,
+        'mimeType' => $mimeType,
+        'id' => $id
+    ]);
+}
+```
+
+### Verify File Paths
+
+```javascript
+import { On, Events } from '#nativephp';
+
+On(Events.Camera.PhotoTaken, async (payload) => {
+  console.log('Photo taken:', {
+    path: payload.path,
+    mimeType: payload.mimeType,
+    id: payload.id
+  });
+  
+  // Test file access
+  try {
+    const response = await fetch(`file://${payload.path}`);
+    const blob = await response.blob();
+    console.log('File accessible, size:', blob.size);
+  } catch (error) {
+    console.error('File access failed:', error);
+  }
+});
+```
+
+## Getting Help
+
+If you're still experiencing issues:
+
+1. **Check the plugin version:** Ensure you're using the latest version
+   ```bash
+   composer show nativephp/mobile-camera
+   ```
+
+2. **Review the logs:** Collect logs from both platforms showing the issue
+
+3. **Create a minimal reproduction:** Isolate the issue in the simplest possible code
+
+4. **Report the issue:** Open an issue on GitHub with:
+   - Plugin version
+   - Platform (Android/iOS) and version
+   - Full error logs
+   - Minimal code to reproduce
+
+<Card title="Report an Issue" icon="github" href="https://github.com/NativePHP/mobile-camera/issues">
+  Found a bug or need help? Open an issue on GitHub.
+</Card>

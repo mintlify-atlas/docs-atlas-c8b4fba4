@@ -1,0 +1,236 @@
+---
+title: 'Camera Methods'
+description: 'Core methods for photo capture, video recording, and media selection'
+---
+
+## Camera.GetPhoto
+
+Capture a photo using the device camera. Opens the native camera interface and returns the captured photo path via events.
+
+### Parameters
+
+<ParamField path="id" type="string" optional>
+  Optional identifier to track this specific photo capture. The `id` will be included in the event payload, allowing you to correlate the result with the original request.
+</ParamField>
+
+<ParamField path="event" type="string" optional>
+  Custom event class to fire when photo is captured. Defaults to `Native\Mobile\Events\Camera\PhotoTaken`. Use this to specify a custom event handler.
+</ParamField>
+
+### Returns
+
+Returns an empty map immediately. Results are delivered asynchronously via events:
+
+- **Success**: Fires `PhotoTaken` event with file path
+- **Cancelled**: Fires `PhotoCancelled` event
+- **Permission Denied**: Fires `PermissionDenied` event (iOS only)
+
+### PHP Usage
+
+```php
+use Native\Mobile\Facades\Camera;
+
+// Simple photo capture
+Camera::getPhoto();
+
+// With identifier
+Camera::getPhoto()->id('profile-photo');
+
+// With custom event
+Camera::getPhoto()
+    ->id('kyc-selfie')
+    ->event(KycPhotoTaken::class);
+```
+
+### JavaScript Usage
+
+```javascript
+import { Camera } from '#nativephp';
+
+// Simple photo capture
+await Camera.getPhoto();
+
+// With identifier
+await Camera.getPhoto().id('profile-photo');
+```
+
+### Platform Implementation
+
+- **Android**: `com.nativephp.camera.CameraFunctions.GetPhoto`
+- **iOS**: `CameraFunctions.GetPhoto`
+
+---
+
+## Camera.RecordVideo
+
+Record a video with the device camera. Opens the native video recorder and returns the recorded video path via events.
+
+### Parameters
+
+<ParamField path="maxDuration" type="int" optional>
+  Maximum recording duration in seconds. If set, the camera will automatically stop recording after this duration. If not specified or set to 0, there is no time limit.
+</ParamField>
+
+<ParamField path="id" type="string" optional>
+  Optional identifier to track this specific video recording. The `id` will be included in the event payload.
+</ParamField>
+
+<ParamField path="event" type="string" optional>
+  Custom event class to fire when video is recorded. Defaults to `Native\Mobile\Events\Camera\VideoRecorded`.
+</ParamField>
+
+### Returns
+
+Returns an empty map immediately. Results are delivered asynchronously via events:
+
+- **Success**: Fires `VideoRecorded` event with file path and MIME type
+- **Cancelled**: Fires `VideoCancelled` event
+- **Permission Denied**: Fires `PermissionDenied` event (iOS only)
+
+### PHP Usage
+
+```php
+use Native\Mobile\Facades\Camera;
+
+// Simple video recording
+Camera::recordVideo();
+
+// With max duration (30 seconds)
+Camera::recordVideo(['maxDuration' => 30]);
+
+// Using fluent API
+Camera::recordVideo()
+    ->maxDuration(60)
+    ->id('intro-video')
+    ->start();
+```
+
+### JavaScript Usage
+
+```javascript
+import { Camera } from '#nativephp';
+
+// Simple video recording
+await Camera.recordVideo();
+
+// With max duration
+await Camera.recordVideo().maxDuration(60);
+
+// With identifier
+await Camera.recordVideo()
+    .maxDuration(30)
+    .id('tutorial-video');
+```
+
+### Platform Implementation
+
+- **Android**: `com.nativephp.camera.CameraFunctions.RecordVideo`
+- **iOS**: `CameraFunctions.RecordVideo`
+
+### Video Format
+
+Videos are saved as MP4 files with the following characteristics:
+- **Format**: MP4 (H.264 video codec)
+- **Quality**: High (platform default)
+- **MIME Type**: `video/mp4`
+
+---
+
+## Camera.PickMedia
+
+Pick media files from the device gallery or photo library. Allows single or multiple selection of images and/or videos.
+
+### Parameters
+
+<ParamField path="mediaType" type="string" default="all">
+  Type of media to allow selection:
+  - `"image"` or `"images"`: Only images
+  - `"video"` or `"videos"`: Only videos
+  - `"all"` or `"*"`: Both images and videos
+</ParamField>
+
+<ParamField path="multiple" type="boolean" default={false}>
+  Allow multiple file selection. If `true`, users can select multiple files up to `maxItems`. If `false`, only a single file can be selected.
+</ParamField>
+
+<ParamField path="maxItems" type="int" default={10}>
+  Maximum number of items that can be selected when `multiple` is `true`. Set to `0` for unlimited selection (iOS only).
+</ParamField>
+
+<ParamField path="id" type="string" optional>
+  Optional identifier to track this operation. Included in the event payload.
+</ParamField>
+
+<ParamField path="event" type="string" optional>
+  Custom event class to fire when media is selected. Defaults to `Native\Mobile\Events\Gallery\MediaSelected`.
+</ParamField>
+
+### Returns
+
+Returns an empty map immediately. Results are delivered via the `MediaSelected` event with:
+- Array of selected file paths
+- MIME types and file extensions
+- Total count
+- Success/cancelled status
+
+### PHP Usage
+
+```php
+use Native\Mobile\Facades\Camera;
+
+// Pick a single image
+Camera::pickImages('images', false);
+
+// Pick multiple images (up to 5)
+Camera::pickImages('images', true);
+
+// Pick any media type
+Camera::pickImages('all', true);
+```
+
+### JavaScript Usage
+
+```javascript
+import { Camera } from '#nativephp';
+
+// Pick a single image
+await Camera.pickImages()
+    .images()
+    .single();
+
+// Pick multiple images
+await Camera.pickImages()
+    .images()
+    .multiple()
+    .maxItems(5);
+
+// Pick videos
+await Camera.pickImages()
+    .videos()
+    .multiple();
+
+// Pick any media
+await Camera.pickImages()
+    .all()
+    .multiple()
+    .maxItems(10);
+```
+
+### Platform Implementation
+
+- **Android**: `com.nativephp.camera.GalleryFunctions.PickMedia`
+- **iOS**: `CameraFunctions.PickMedia`
+
+### Supported File Types
+
+**Images**:
+- JPEG/JPG (`image/jpeg`)
+- PNG (`image/png`)
+- GIF (`image/gif`)
+- WebP (`image/webp`)
+
+**Videos**:
+- MP4 (`video/mp4`)
+- MOV (`video/quicktime`)
+- AVI (`video/avi`)
+- WebM (`video/webm`)

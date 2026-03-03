@@ -1,0 +1,134 @@
+---
+title: Introduction
+description: Camera plugin for NativePHP Mobile providing photo capture, video recording, and gallery picker functionality
+---
+
+# Camera Plugin for NativePHP Mobile
+
+The Camera Plugin brings powerful media capture capabilities to your NativePHP Mobile applications. Access the device camera, record videos, and let users pick media from their gallery with a clean, event-driven API.
+
+## What You Can Build
+
+With the Camera Plugin, you can:
+
+- **Capture Photos** - Take high-quality photos directly from the device camera
+- **Record Videos** - Record videos with customizable duration limits and quality settings
+- **Pick from Gallery** - Let users select existing photos and videos from their device
+- **Track Operations** - Use optional IDs to correlate captures with specific features
+- **Handle Events** - Respond to photo captures, video recordings, and user cancellations
+- **Custom Events** - Fire your own event classes for advanced workflows
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Photo Capture" icon="camera">
+    Simple API to capture photos with JPEG output. Photos are automatically saved to the app's cache directory.
+  </Card>
+  
+  <Card title="Video Recording" icon="video">
+    Record MP4 videos with optional maximum duration limits. Perfect for user-generated content.
+  </Card>
+  
+  <Card title="Gallery Picker" icon="images">
+    Let users select single or multiple images/videos from their device gallery with customizable filters.
+  </Card>
+  
+  <Card title="Cross-Platform" icon="mobile">
+    Works seamlessly on both iOS (18.2+) and Android (API 33+) with unified APIs.
+  </Card>
+  
+  <Card title="Event-Driven" icon="bolt">
+    Built-in events for photo captures, video recordings, cancellations, and permission denials.
+  </Card>
+  
+  <Card title="Fluent APIs" icon="code">
+    Chain methods for clean, readable code in both PHP and JavaScript.
+  </Card>
+</CardGroup>
+
+## Example: Capture a Photo
+
+<CodeGroup>
+```php PHP (Livewire/Blade)
+use Native\Mobile\Facades\Camera;
+use Native\Mobile\Attributes\OnNative;
+use Native\Mobile\Events\Camera\PhotoTaken;
+
+class ProfileComponent extends Component
+{
+    public function takeProfilePicture()
+    {
+        Camera::getPhoto();
+    }
+    
+    #[OnNative(PhotoTaken::class)]
+    public function handlePhotoTaken(string $path)
+    {
+        // Process the captured photo
+        $this->profilePhoto = $path;
+    }
+}
+```
+
+```javascript JavaScript (Vue/React)
+import { Camera, On, Off, Events } from '#nativephp';
+import { ref, onMounted, onUnmounted } from 'vue';
+
+const photoPath = ref('');
+
+const takePhoto = async () => {
+    await Camera.getPhoto();
+};
+
+const handlePhotoTaken = (payload) => {
+    photoPath.value = payload.path;
+};
+
+onMounted(() => {
+    On(Events.Camera.PhotoTaken, handlePhotoTaken);
+});
+
+onUnmounted(() => {
+    Off(Events.Camera.PhotoTaken, handlePhotoTaken);
+});
+```
+</CodeGroup>
+
+## Platform Support
+
+- **Android**: API Level 33+ (Android 13)
+- **iOS**: Version 18.2+
+- **PHP**: 8.2+
+- **NativePHP Mobile**: Latest version
+
+## Get Started
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the plugin and configure permissions
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in minutes
+  </Card>
+  
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Explore all available methods and events
+  </Card>
+</CardGroup>
+
+## Storage Locations
+
+The plugin automatically manages file storage for you:
+
+**Photos:**
+- **Android**: App cache directory at `{cache}/captured.jpg`
+- **iOS**: Application Support at `~/Library/Application Support/Photos/captured.jpg`
+
+**Videos:**
+- **Android**: App cache directory at `{cache}/video_{timestamp}.mp4`
+- **iOS**: Application Support at `~/Library/Application Support/Videos/captured_video_{timestamp}.mp4`
+
+<Note>
+All captured media uses temporary storage and is excluded from device backups for optimal performance.
+</Note>
